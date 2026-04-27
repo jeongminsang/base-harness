@@ -1,0 +1,15 @@
+{
+  "version": "0.1",
+  "preset": "react-ts",
+  "buildCheckCmd": "yarn tsc --noEmit",
+  "lintCmd": "npx eslint",
+  "srcDir": "src/",
+  "archTriggerPaths": ["src/pages/", "src/components/"],
+  "qaTriggerMinLines": 30,
+  "debateLedger": "../memory/debate/rounds.json",
+  "qualityGate": {
+    "minDiffLines": 10,
+    "rejectWhitespaceOnly": true,
+    "rejectIfDuplicateSkill": true
+  }
+}
