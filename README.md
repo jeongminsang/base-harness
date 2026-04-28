@@ -1,12 +1,11 @@
-# Claude Code Harness
+# AI Code Harness
 
-Self-enforcing AI harness for Claude Code projects. Hooks enforce code quality at write-time, agent personas provide role separation, and a skill system captures learned patterns.
+Self-enforcing harness for AI-assisted development. Hooks enforce code quality at write-time, agent personas provide role separation, and a skill system captures learned patterns.
 
 ## Prerequisites
 
 - Node.js >= 18
 - Git repository
-- [Claude Code](https://claude.ai/code) CLI
 
 ## Install
 
@@ -24,7 +23,7 @@ The installer asks 6 questions and wires everything up in ~30 seconds.
 
 ```
 your-repo/
-├── hooks/           # Claude Code hooks (Node.js, zero-dep)
+├── hooks/           # Quality enforcement hooks (Node.js, zero-dep)
 ├── agents/          # Agent persona definitions
 ├── memory/          # Debate ledger + notepad + project facts
 ├── skills/          # Pattern library (grows over time)
@@ -35,11 +34,11 @@ your-repo/
 
 ## Quickstart (after install)
 
-1. Open Claude Code in your project
+1. Open your AI coding agent in the project
 2. Start coding — hooks fire automatically on every Write/Edit
 3. When a new page/component is needed, the debate protocol activates:
    ```
-   [Claude creates PROPOSED round]
+   [PROPOSED round created]
    → spawn critic Agent() → CHALLENGED
    → analyst confirms → CONSENSUS
    → executor writes file
@@ -52,10 +51,10 @@ your-repo/
 
 Set in `hooks/config.json`:
 ```json
-{ "preset": "react-ts" }
+{ "preset": "vite" }
 ```
 
-Available presets: `react-ts`, `vanilla-ts`  
+Available presets: `vite`, `vanilla-ts`  
 Custom preset: create `harness/presets/<name>/l3-rules.cjs`
 
 ### ARCH-TRIGGER Paths

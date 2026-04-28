@@ -129,7 +129,7 @@ echo ""
 info "Project configuration"
 echo ""
 
-PRESET=$(prompt_choice "Stack preset" "react-ts | next-ts | vanilla-ts" "react-ts")
+PRESET=$(prompt_choice "Stack preset" "vite | next-ts | vanilla-ts" "vite")
 BUILD_CMD=$(prompt "Build check command" "yarn tsc --noEmit")
 LINT_CMD=$(prompt "Lint command" "npx eslint")
 SRC_DIR=$(prompt "Source directory" "src/")
@@ -222,7 +222,14 @@ ok ".claude/settings.json ready"
 
 # ─── Step 7: Generate AGENTS.md ───────────────────────────────────────────────
 
-if [[ ! -f "AGENTS.md" ]]; then
+REGEN_AGENTS=false
+if [[ -f "AGENTS.md" ]]; then
+  if prompt_yn "AGENTS.md already exists. Regenerate?"; then
+    REGEN_AGENTS=true
+  fi
+fi
+
+if [[ ! -f "AGENTS.md" || "$REGEN_AGENTS" == true ]]; then
   info "Generating AGENTS.md..."
   if [[ "$LOCAL_MODE" == true ]]; then
     TPL=$(cat "$TEMPLATES_DIR/AGENTS.md.tpl")

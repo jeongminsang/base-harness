@@ -1,6 +1,6 @@
 {
   "version": "0.1",
-  "preset": "react-ts",
+  "preset": "vite",
   "buildCheckCmd": "yarn tsc --noEmit",
   "lintCmd": "npx eslint",
   "srcDir": "src/",

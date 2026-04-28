@@ -229,7 +229,7 @@ module.exports = {
 
 | Preset | Rules included |
 |--------|----------------|
-| `react-ts` | `api-error-handling`, `rhf-zod`, `prohibited-utilities`, `custom-hook-extraction` |
+| `vite` | `api-error-handling`, `rhf-zod`, `prohibited-utilities`, `custom-hook-extraction` |
 | `vanilla-ts` | None (core rules only: `no-any-type`, `ARCH-TRIGGER`) |
 
 ### Custom Preset
@@ -255,7 +255,7 @@ module.exports = {
 ```json
 {
   "version": "0.1",
-  "preset": "react-ts",
+  "preset": "vite",
   "buildCheckCmd": "yarn tsc --noEmit",
   "lintCmd": "npx eslint",
   "srcDir": "src/",
