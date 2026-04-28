@@ -10,8 +10,8 @@ const ROOT = path.resolve(__dirname, "..");
 const SKILLS = path.join(ROOT, "skills");
 const K = 3;
 
-// Claude Code hook: stdin JSON → tool_input 텍스트 추출
-// CLI 수동 호출: process.argv 그대로 사용
+// Adapter hook path: stdin JSON → tool_input 텍스트 추출
+// CLI/manual path: process.argv 그대로 사용
 let task = process.argv.slice(2).join(" ").toLowerCase();
 if (!task && !process.stdin.isTTY) {
   try {

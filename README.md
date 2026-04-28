@@ -1,6 +1,6 @@
 # Base Harness
 
-Self-enforcing harness for AI-assisted development. Hooks enforce code quality at write-time, agent personas provide role separation, and a skill system captures learned patterns.
+Self-enforcing harness for AI-assisted development. The shared core owns rules, memory, skills, debate state, and verification gates. Claude and Codex each get a thin adapter layer.
 
 ## Prerequisites
 
@@ -10,82 +10,69 @@ Self-enforcing harness for AI-assisted development. Hooks enforce code quality a
 ## Install
 
 ```bash
-# Remote (curl)
+# Remote
 curl -sSL https://raw.githubusercontent.com/jeongminsang/base-harness/main/bootstrap.sh | bash
 
-# Local (from this repo)
-bash harness/bootstrap.sh
+# Local
+bash bootstrap.sh
 ```
 
-The installer asks 6 questions and wires everything up in ~30 seconds.
+The installer keeps `bootstrap.sh` as the single entrypoint and lets you install `claude`, `codex`, or `both`.
 
 ## What Gets Installed
 
-```
+```text
 your-repo/
-├── hooks/           # Quality enforcement hooks (Node.js, zero-dep)
-├── agents/          # Agent persona definitions
-├── memory/          # Debate ledger + notepad + project facts
-├── skills/          # Pattern library (grows over time)
-├── AGENTS.md        # Agent coordination rules
-└── .claude/
-    └── settings.json  # Hook registration
+├── hooks/            # Shared enforcement scripts
+├── agents/           # Shared personas
+├── memory/           # Debate ledger + notepad + project facts
+├── skills/           # Pattern library
+├── state/            # Canonical verifier artifact location
+├── AGENTS.md         # Shared operator contract
+├── .claude/          # Claude adapter: automatic hooks
+└── .codex/           # Codex adapter: explicit commands
 ```
 
-## Quickstart (after install)
+## Quickstart
 
-1. Open your AI coding agent in the project
-2. Start coding — hooks fire automatically on every Write/Edit
-3. When a new page/component is needed, the debate protocol activates:
+### Claude
+
+1. Install with the `claude` or `both` adapter option.
+2. Open Claude Code in the repo.
+3. Claude reads `.claude/settings.json` and runs the shared hook pipeline automatically.
+
+### Codex
+
+1. Install with the `codex` or `both` adapter option.
+2. Before substantial work, run:
+   ```bash
+   ./.codex/commands/preflight.sh "task summary"
    ```
-   [PROPOSED round created]
-   → spawn critic Agent() → CHALLENGED
-   → analyst confirms → CONSENSUS
-   → executor writes file
+3. After substantial edits, run:
+   ```bash
+   ./.codex/commands/post-task.sh
    ```
-4. Skills accumulate as `*.draft.md` files; promote them by renaming to `*.md`
+4. After verification, record the verified files and run the final gate:
+   ```bash
+   ./.codex/commands/mark-verified.sh src/example.ts src/example.test.ts
+   ./.codex/commands/final-check.sh
+   ```
 
-## Customization
+## Canonical Verification State
 
-### Stack Preset
+The canonical success marker is `state/verified-complete.json`.
 
-Set in `hooks/config.json`:
-```json
-{ "preset": "vite" }
-```
-
-Available presets: `vite`, `vanilla-ts`  
-Custom preset: create `harness/presets/<name>/l3-rules.cjs`
-
-### ARCH-TRIGGER Paths
-
-Files that require debate before creation:
-```json
-{ "archTriggerPaths": ["src/pages/", "src/components/"] }
-```
-
-### Build / Lint Commands
-
-```json
-{
-  "buildCheckCmd": "yarn tsc --noEmit",
-  "lintCmd": "npx eslint"
-}
-```
+During migration, the harness still accepts the legacy `.omc/state/verified_complete.json` file if it already exists, but new installs and new verifier writes should use `state/verified-complete.json`.
 
 ## Update
 
-Re-run the installer — it detects existing install and offers update mode:
-```bash
-bash harness/bootstrap.sh
-```
+Re-run `bootstrap.sh`. It is safe for update mode:
 
-Or pull latest hooks manually:
-```bash
-cp harness/templates/hooks/*.cjs hooks/
-cp harness/templates/hooks/lib/*.cjs hooks/lib/
-```
+- Existing `.claude/settings.json` files keep non-hook settings and get only the hook section refreshed.
+- Existing `AGENTS.md` files prompt before regeneration.
+- Re-running Codex install refreshes `.codex/commands/*` deterministically.
 
-## Architecture
+## Docs
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for a deep-dive into every component.
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [templates/AGENTS.md.tpl](./templates/AGENTS.md.tpl)

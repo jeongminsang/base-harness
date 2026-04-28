@@ -1,6 +1,5 @@
 ---
 persona: learner
-extends: global-omc-writer
 model: haiku
 ---
 

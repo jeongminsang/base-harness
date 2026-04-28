@@ -1,6 +1,6 @@
-# AGENTS.md — Claude Code Harness
+# AGENTS.md — Base Harness
 
-> `VER: 1.0` · `PRESET: {{PRESET}}` · `STYLE: Lean/Condensed` · `OS: OMC-Native`
+> `VER: 1.1` · `PRESET: {{PRESET}}` · `STYLE: Lean/Condensed` · `MODE: Tool-Neutral`
 
 ## 0. Glossary
 
@@ -13,7 +13,7 @@
 
 ## 1. System Architecture
 
-- **CTRL (CP)**: `skills/`, `hooks/`, `memory/`, `agents/`, `AGENTS.md`. Owner: Harness.
+- **CTRL (CP)**: `skills/`, `hooks/`, `memory/`, `state/`, `agents/`, `AGENTS.md`. Owner: Harness.
 - **DATA (DP)**: `{{SRC_DIR}}`. Owner: App Logic. Harness MUST NOT edit without `executor` persona.
 - **H1 (Harness-First)**: Every task starts with Harness Sync. Update/Create `SKILL.md` *BEFORE* touching `{{SRC_DIR}}`.
 - **SEP**: Harness logic is root-level. App logic is `{{SRC_DIR}}`-scoped. No cross-pollution.
@@ -64,6 +64,7 @@
 - **NO-EVIDENCE = NO-SUCCESS**: `verifier` MUST reject claims without command output.
 - **FRESHNESS**: Evidence must be < 5 mins old.
 - **SCOPE**: Build pass + Test pass + Visual/Logic consistency check.
+- **ARTIFACT**: Canonical verification record is `state/verified-complete.json`.
 
 ## 6. Governance (The 5 Laws)
 
@@ -126,17 +127,38 @@ PROPOSED → CHALLENGED → (REVISED) → CONSENSUS → executor implements
 1. **PROHIBITED**: inline critic analysis in current context
 2. **REQUIRED**:
    ```
-   Agent(
-     subagent_type="oh-my-claudecode:critic",
-     prompt="[proposal content + relevant skills only, no full conversation history]"
-   )
+   Launch a fresh `critic` agent with:
+   - the proposal content
+   - relevant skills only
+   - no full conversation history
    ```
 3. Critic updates round to `state: "CHALLENGED"` with ≥3 challenges
 4. Analyst may only finalize CONSENSUS after CHALLENGED is confirmed
 
 **Reason**: Proposer performing critic role in same context → self-consistency bias.
 
-## 10. Persistent Memory Tags
+### Adapter Examples
+
+- Claude adapter: launch a fresh critic/verifier agent using your Claude sub-agent flow and `agents/critic.md` or `agents/reviewer.md`.
+- Codex adapter: spawn a fresh agent using the same persona files, then run `./.codex/commands/final-check.sh` after verification is recorded.
+
+## 10. Codex Workflow
+
+Codex does not receive automatic hook events. Run these commands manually at the indicated points:
+
+| When | Command | What it does |
+|------|---------|--------------|
+| Before major work | `./.codex/commands/preflight.sh "<task summary>"` | Loads matching skills + flags open debate rounds |
+| After substantial edits | `./.codex/commands/post-task.sh` | Drafts skills from git diff, creates ARCH-TRIGGER debate rounds |
+| After verifying output | `./.codex/commands/mark-verified.sh <files...>` | Records verification artifact in `state/verified-complete.json` |
+| Before finishing | `./.codex/commands/final-check.sh` | Runs full gate: debate → L3 → build → lint → verification (must exit 0) |
+
+**Rules:**
+- `final-check.sh` **must pass** before a task is considered done. A non-zero exit is a hard block.
+- `mark-verified.sh` must be run with all changed source files as arguments before `final-check.sh`.
+- If `preflight.sh` reports open `PROPOSED` debate rounds, resolve them via the deliberation protocol (§8) before implementing.
+
+## 11. Persistent Memory Tags
 
 - `<remember>`: Temp (7 days). Store in `notepad.md`.
 - `<remember priority>`: Permanent. Store in `project-memory.json`.

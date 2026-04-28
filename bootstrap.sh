@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Claude Code Harness — Bootstrap Installer
+# Base Harness — Bootstrap Installer
 #
 # Remote:  curl -sSL https://raw.githubusercontent.com/jeongminsang/base-harness/main/bootstrap.sh | bash
 # Local:   bash bootstrap.sh
 
 set -euo pipefail
 
-HARNESS_VERSION="1.0.0"
+HARNESS_VERSION="1.1.0"
 HARNESS_BRANCH="main"
 HARNESS_REPO_RAW="https://raw.githubusercontent.com/jeongminsang/base-harness/${HARNESS_BRANCH}"
 
@@ -64,6 +64,14 @@ prompt_choice() {
   echo "${answer:-$default}"
 }
 
+prompt_yn() {
+  local question="$1" default="${2:-y}" answer normalized
+  printf "  %s (y/n) [%s]: " "$(bold "$question")" "$default" >&2
+  answer="$(_read_answer)"
+  normalized="$(printf '%s' "${answer:-$default}" | tr '[:upper:]' '[:lower:]')"
+  [[ "$normalized" == "y" || "$normalized" == "yes" ]]
+}
+
 fetch_file() {
   local rel_path="$1" dest="$2"
   mkdir -p "$(dirname "$dest")"
@@ -87,8 +95,8 @@ fetch_preset_file() {
 # ─── Banner ───────────────────────────────────────────────────────────────────
 
 echo ""
-echo "  $(bold 'Claude Code Harness') v${HARNESS_VERSION}"
-echo "  Self-enforcing AI harness for Claude Code projects"
+echo "  $(bold 'Base Harness') v${HARNESS_VERSION}"
+echo "  Self-enforcing harness for Claude and Codex projects"
 echo ""
 
 # ─── Step 1: Prerequisites ────────────────────────────────────────────────────
@@ -114,7 +122,7 @@ if [[ -d "hooks" && -f "hooks/config.json" ]]; then
   warn "Existing harness detected — running in update mode"
   echo ""
   printf "  $(bold 'Update hooks and agents?') (y/n) [y]: "
-  read -r update_confirm
+  update_confirm="$(_read_answer)"
   if [[ "${update_confirm:-y}" != "y" ]]; then
     echo ""
     echo "  Cancelled. No changes made."
@@ -130,6 +138,7 @@ info "Project configuration"
 echo ""
 
 PRESET=$(prompt_choice "Stack preset" "vite | next-ts | vanilla-ts" "vite")
+ADAPTERS=$(prompt_choice "Adapter install" "claude | codex | both" "both")
 BUILD_CMD=$(prompt "Build check command" "yarn tsc --noEmit")
 LINT_CMD=$(prompt "Lint command" "npx eslint")
 SRC_DIR=$(prompt "Source directory" "src/")
@@ -149,18 +158,21 @@ for i in "${!_ARCH_ARRAY[@]}"; do
 done
 ARCH_JSON="${ARCH_JSON}]"
 
-# ─── Step 3: Install core hook files ─────────────────────────────────────────
+# ─── Step 3: Install common core ─────────────────────────────────────────────
 
-info "Installing hook scripts..."
+info "Installing common harness files..."
 mkdir -p hooks/lib
 fetch_file "hooks/pre-task.cjs"             "hooks/pre-task.cjs"
 fetch_file "hooks/pre-tool-enforcer.cjs"    "hooks/pre-tool-enforcer.cjs"
 fetch_file "hooks/post-task.cjs"            "hooks/post-task.cjs"
 fetch_file "hooks/post-bash-verifier.cjs"   "hooks/post-bash-verifier.cjs"
 fetch_file "hooks/stop-enforcer.cjs"        "hooks/stop-enforcer.cjs"
+fetch_file "hooks/run-final-check.cjs"      "hooks/run-final-check.cjs"
+fetch_file "hooks/write-verified-complete.cjs" "hooks/write-verified-complete.cjs"
 fetch_file "hooks/on-failure.cjs"           "hooks/on-failure.cjs"
 fetch_file "hooks/lib/l3-rules.cjs"         "hooks/lib/l3-rules.cjs"
-ok "Hooks installed"
+fetch_file "hooks/lib/final-gate.cjs"       "hooks/lib/final-gate.cjs"
+ok "Common hook files installed"
 
 info "Installing agent personas..."
 mkdir -p agents
@@ -182,12 +194,14 @@ cat > hooks/config.json << CONFIGEOF
 {
   "version": "0.1",
   "preset": "${PRESET}",
+  "adapters": "${ADAPTERS}",
   "buildCheckCmd": "${BUILD_CMD}",
   "lintCmd": "${LINT_CMD}",
   "srcDir": "${SRC_DIR}",
   "archTriggerPaths": ${ARCH_JSON},
   "qaTriggerMinLines": 30,
   "debateLedger": "../memory/debate/rounds.json",
+  "verifiedCompletePath": "../state/verified-complete.json",
   "qualityGate": {
     "minDiffLines": ${MIN_DIFF},
     "rejectWhitespaceOnly": true,
@@ -197,28 +211,56 @@ cat > hooks/config.json << CONFIGEOF
 CONFIGEOF
 ok "hooks/config.json written"
 
-# ─── Step 6: Wire .claude/settings.json ──────────────────────────────────────
+# ─── Step 6: Install adapters ────────────────────────────────────────────────
 
-mkdir -p .claude
-if [[ -f ".claude/settings.json" && "$UPDATE_MODE" == true ]]; then
-  warn ".claude/settings.json exists — merging hooks section only"
-  HOOKS_JSON=$(
-    if [[ "$LOCAL_MODE" == true ]]; then
-      cat "$TEMPLATES_DIR/.claude/settings.json"
-    else
-      curl -fsSL "$HARNESS_REPO_RAW/templates/.claude/settings.json"
-    fi
-  )
-  node -e "
-    const fs = require('fs');
-    const existing = JSON.parse(fs.readFileSync('.claude/settings.json','utf8'));
-    const tpl = JSON.parse(process.env.HOOKS_JSON);
-    fs.writeFileSync('.claude/settings.json', JSON.stringify({...existing, hooks: tpl.hooks}, null, 2));
-  " HOOKS_JSON="$HOOKS_JSON"
-else
-  fetch_file ".claude/settings.json" ".claude/settings.json"
+install_claude=false
+install_codex=false
+case "$ADAPTERS" in
+  claude) install_claude=true ;;
+  codex)  install_codex=true ;;
+  both)   install_claude=true; install_codex=true ;;
+  *)
+    warn "Unknown adapter choice '${ADAPTERS}' — defaulting to both"
+    install_claude=true
+    install_codex=true
+    ;;
+esac
+
+if [[ "$install_claude" == true ]]; then
+  info "Installing Claude adapter..."
+  mkdir -p .claude
+  if [[ -f ".claude/settings.json" && "$UPDATE_MODE" == true ]]; then
+    warn ".claude/settings.json exists — merging hooks section only"
+    HOOKS_JSON=$(
+      if [[ "$LOCAL_MODE" == true ]]; then
+        cat "$TEMPLATES_DIR/.claude/settings.json"
+      else
+        curl -fsSL "$HARNESS_REPO_RAW/templates/.claude/settings.json"
+      fi
+    )
+    HOOKS_JSON="$HOOKS_JSON" node -e "
+      const fs = require('fs');
+      const existing = JSON.parse(fs.readFileSync('.claude/settings.json','utf8'));
+      const tpl = JSON.parse(process.env.HOOKS_JSON);
+      fs.writeFileSync('.claude/settings.json', JSON.stringify({...existing, hooks: tpl.hooks}, null, 2));
+    "
+  else
+    fetch_file ".claude/settings.json" ".claude/settings.json"
+  fi
+  ok "Claude adapter ready"
 fi
-ok ".claude/settings.json ready"
+
+if [[ "$install_codex" == true ]]; then
+  info "Installing Codex adapter..."
+  mkdir -p .codex/commands
+  fetch_file ".codex/README.md" ".codex/README.md"
+  fetch_file ".codex/commands/preflight.sh" ".codex/commands/preflight.sh"
+  fetch_file ".codex/commands/post-task.sh" ".codex/commands/post-task.sh"
+  fetch_file ".codex/commands/final-check.sh" ".codex/commands/final-check.sh"
+  fetch_file ".codex/commands/mark-verified.sh" ".codex/commands/mark-verified.sh"
+  chmod +x .codex/commands/*.sh
+  ok "Codex adapter ready"
+fi
 
 # ─── Step 7: Generate AGENTS.md ───────────────────────────────────────────────
 
@@ -272,6 +314,12 @@ MEMEOF
   ok "memory/ initialized"
 fi
 
+if [[ ! -d "state" ]]; then
+  info "Initializing state/..."
+  mkdir -p state
+  ok "state/ initialized"
+fi
+
 # ─── Step 9: Initialize skills/ ───────────────────────────────────────────────
 
 if [[ ! -d "skills" ]]; then
@@ -289,15 +337,33 @@ echo "  $(green "$(bold '✅ Harness installed successfully!')")"
 echo ""
 echo "  Configuration:"
 printf "    %-14s %s\n" "Preset:"    "${PRESET}"
+printf "    %-14s %s\n" "Adapters:"  "${ADAPTERS}"
 printf "    %-14s %s\n" "Build:"     "${BUILD_CMD}"
 printf "    %-14s %s\n" "Lint:"      "${LINT_CMD}"
 printf "    %-14s %s\n" "Src dir:"   "${SRC_DIR}"
 printf "    %-14s %s\n" "ARCH paths:" "${ARCH_PATHS_RAW}"
 echo ""
+STAGE_TARGETS="hooks/ agents/ memory/ skills/ state/ AGENTS.md"
+if [[ "$install_claude" == true ]]; then
+  STAGE_TARGETS="${STAGE_TARGETS} .claude/"
+fi
+if [[ "$install_codex" == true ]]; then
+  STAGE_TARGETS="${STAGE_TARGETS} .codex/"
+fi
 echo "  Next steps:"
 echo "    1. Review $(bold 'AGENTS.md') — add your stack-specific notes"
-echo "    2. Stage:  $(bold "git add hooks/ agents/ memory/ skills/ .claude/ AGENTS.md")"
-echo "    3. Open Claude Code — hooks are live"
+echo "    2. Stage:  $(bold "git add ${STAGE_TARGETS}")"
+if [[ "$install_claude" == true ]]; then
+  echo "    3. Claude: open Claude Code — hooks are live via .claude/settings.json"
+fi
+if [[ "$install_codex" == true ]]; then
+  echo "    4. Codex: run ./.codex/commands/preflight.sh \"<task>\" before major work"
+  echo "    5. Codex: run ./.codex/commands/final-check.sh before you finish"
+fi
 echo ""
-echo "  Docs: harness/ARCHITECTURE.md"
+DOCS_LINE="README.md, ARCHITECTURE.md"
+if [[ "$install_codex" == true ]]; then
+  DOCS_LINE="${DOCS_LINE}, .codex/README.md"
+fi
+echo "  Docs: ${DOCS_LINE}"
 echo ""

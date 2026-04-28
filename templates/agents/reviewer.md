@@ -1,6 +1,5 @@
 ---
 persona: reviewer
-extends: global-omc-code-reviewer
 model: opus
 ---
 

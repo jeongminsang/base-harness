@@ -3,7 +3,10 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = path.resolve(__dirname, "../../..");
+const ROOT = (() => {
+  const candidate = path.resolve(__dirname, "../..");
+  return path.basename(candidate) === "templates" ? path.dirname(candidate) : candidate;
+})();
 
 // Load config
 let CFG = {};
