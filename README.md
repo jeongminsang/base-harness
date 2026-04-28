@@ -1,4 +1,4 @@
-# AI Code Harness
+# Base Harness
 
 Self-enforcing harness for AI-assisted development. Hooks enforce code quality at write-time, agent personas provide role separation, and a skill system captures learned patterns.
 
