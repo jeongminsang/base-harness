@@ -12,7 +12,7 @@ Self-enforcing AI harness for Claude Code projects. Hooks enforce code quality a
 
 ```bash
 # Remote (curl)
-curl -sSL https://raw.githubusercontent.com/jeongminsang/traveldreams/main/harness/bootstrap.sh | bash
+curl -sSL https://raw.githubusercontent.com/jeongminsang/harness/main/bootstrap.sh | bash
 
 # Local (from this repo)
 bash harness/bootstrap.sh

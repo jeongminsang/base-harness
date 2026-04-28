@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Claude Code Harness — Bootstrap Installer
 #
-# Remote:  curl -sSL https://raw.githubusercontent.com/jeongminsang/traveldreams/main/harness/bootstrap.sh | bash
-# Local:   bash harness/bootstrap.sh
+# Remote:  curl -sSL https://raw.githubusercontent.com/jeongminsang/harness/main/bootstrap.sh | bash
+# Local:   bash bootstrap.sh
 
 set -euo pipefail
 
 HARNESS_VERSION="1.0.0"
 HARNESS_BRANCH="main"
-HARNESS_REPO_RAW="https://raw.githubusercontent.com/jeongminsang/traveldreams/${HARNESS_BRANCH}/harness"
+HARNESS_REPO_RAW="https://raw.githubusercontent.com/jeongminsang/harness/${HARNESS_BRANCH}"
 
 # ─── TTY detection: curl | bash steals stdin; reads need /dev/tty ─────────────
 _HAS_TTY=false
