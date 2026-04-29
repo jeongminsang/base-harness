@@ -200,8 +200,8 @@ cat > hooks/config.json << CONFIGEOF
   "srcDir": "${SRC_DIR}",
   "archTriggerPaths": ${ARCH_JSON},
   "qaTriggerMinLines": 30,
-  "debateLedger": "../memory/debate/rounds.json",
-  "verifiedCompletePath": "../state/verified-complete.json",
+  "debateLedger": "memory/debate/rounds.json",
+  "verifiedCompletePath": ".omc/state/verified-complete.json",
   "qualityGate": {
     "minDiffLines": ${MIN_DIFF},
     "rejectWhitespaceOnly": true,
