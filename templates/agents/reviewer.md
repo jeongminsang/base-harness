@@ -1,6 +1,6 @@
 ---
 persona: reviewer
-model: opus
+tier: 3
 ---
 
 # reviewer — task-local overrides

@@ -43,9 +43,10 @@ function getChangedFiles(srcDir) {
 }
 
 function getVerifiedPaths(cfg) {
-  const configured = cfg.verifiedCompletePath || ".omc/state/verified-complete.json";
+  const configured = cfg.verifiedCompletePath || "state/verified-complete.json";
   return [
     path.join(ROOT, configured),
+    path.join(ROOT, ".omc/state/verified-complete.json"),
     path.join(ROOT, ".omc/state/verified_complete.json"),
   ];
 }
@@ -149,7 +150,7 @@ function evaluateFinalGate() {
   }
 
   if (!verified) {
-    const canonical = cfg.verifiedCompletePath || ".omc/state/verified-complete.json";
+    const canonical = cfg.verifiedCompletePath || "state/verified-complete.json";
     return {
       ok: false,
       gate: 4,

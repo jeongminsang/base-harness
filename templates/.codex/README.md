@@ -19,4 +19,4 @@ Codex does not use Claude's automatic hook API, so this adapter provides explici
 4. Record the verified files with `mark-verified.sh`.
 5. Run `final-check.sh` before finishing.
 
-The canonical verification artifact is `state/verified-complete.json`. During migration, the harness still accepts the legacy `.omc/state/verified_complete.json` file if it already exists.
+The canonical verification artifact is `state/verified-complete.json`. During migration, the harness still accepts legacy `.omc/state/verified-complete.json` and `.omc/state/verified_complete.json` files if they already exist.

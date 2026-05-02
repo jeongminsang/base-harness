@@ -1,6 +1,6 @@
 ---
 persona: architect
-model: opus
+tier: 3
 ---
 
 # architect — structural proposal agent

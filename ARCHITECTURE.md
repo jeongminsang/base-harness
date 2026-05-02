@@ -6,15 +6,17 @@
 COMMON CORE                   ADAPTERS
 ───────────────               ────────────────
 hooks/                        .claude/
-agents/                       .codex/
-skills/
-memory/
+agents/                       .opencode/
+skills/                       .omx/
+memory/                       .codex/
 state/
 AGENTS.md
 ```
 
 - The core is tool-agnostic and repo-owned.
 - `.claude/settings.json` is the Claude adapter only.
+- `.opencode/settings.json` is the OpenCode (OMO) adapter only.
+- `.omx/settings.json` is the OMX adapter only.
 - `.codex/` is the Codex adapter only.
 - App code stays in your project source tree and must not import harness files.
 
@@ -31,20 +33,24 @@ The shared core defines:
 
 The legacy `.omc/state/verified_complete.json` path is read only for backward compatibility during migration.
 
-## 3. Claude Adapter
+## 3. OpenCode-based Adapters (Claude / OMO / OMX)
 
-Claude uses automatic hook events from `.claude/settings.json`:
+Claude, OpenCode (OMO), and OMX share the same hook event API. Each uses automatic hook events from its respective settings file:
+
+- Claude: `.claude/settings.json`
+- OpenCode (OMO): `.opencode/settings.json`
+- OMX: `.omx/settings.json`
 
 - `PreToolUse` → `hooks/pre-tool-enforcer.cjs`, `hooks/pre-task.cjs`
 - `PostToolUse` for writes/edits → `hooks/post-task.cjs`
 - `PostToolUse` for bash → `hooks/post-bash-verifier.cjs`
 - `Stop` → `hooks/stop-enforcer.cjs`
 
-This adapter is the only place that depends on Claude hook event names.
+These adapters are the only place that depends on hook event names (shared across all OpenCode-based platforms).
 
 ## 4. Codex Adapter
 
-Codex uses explicit commands instead of automatic hooks:
+Unlike the OpenCode-based platforms, Codex uses explicit commands instead of automatic hooks:
 
 - `./.codex/commands/preflight.sh "task summary"`
 - `./.codex/commands/post-task.sh`
@@ -65,7 +71,7 @@ Gate order:
 4. `lintCmd` passes on changed files.
 5. Verification artifact covers all changed files.
 
-Claude reaches this through `hooks/stop-enforcer.cjs`. Codex reaches it through `hooks/run-final-check.cjs`.
+Claude / OMO / OMX reach this through `hooks/stop-enforcer.cjs`. Codex reaches it through `hooks/run-final-check.cjs`.
 
 ## 6. Deliberation Protocol
 

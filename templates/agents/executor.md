@@ -1,6 +1,6 @@
 ---
 persona: executor
-model: sonnet
+tier: 2
 ---
 
 # executor — task-local overrides
@@ -15,6 +15,6 @@ model: sonnet
        - Proposal format: `[SLL-PROPOSE] <id> / level=(1|2|3) / reason`. Default level=2. L3 promotion requires critic sign-off.
     5. **Audit**: Self-review — "Does this code violate any active Skill?"
     6. **Evidence**: `yarn build` + `yarn lint` clean logs. Success is ONLY defined by clean output.
-    7. **Post**: Run `node hooks/post-task.cjs` or `./.codex/commands/post-task.sh`.
+    7. **Post**: Run `node hooks/post-task.cjs` (or your platform's equivalent).
 - `SCOPE`: edits restricted to `src/`; never mutate harness files unless task is harness-level.
 - `VALIDATE`: run `yarn build` (or `tsc --noEmit`) to verify no type errors were introduced. Fail the task if types are broken.

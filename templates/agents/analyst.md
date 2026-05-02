@@ -1,6 +1,6 @@
 ---
 persona: analyst
-model: sonnet
+tier: 2
 ---
 
 # analyst — evidence-based consensus evaluator

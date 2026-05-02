@@ -1,6 +1,6 @@
 ---
 persona: critic
-model: opus
+tier: 3
 ---
 
 # critic — adversarial challenger

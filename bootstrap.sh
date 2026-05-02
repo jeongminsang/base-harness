@@ -96,7 +96,7 @@ fetch_preset_file() {
 
 echo ""
 echo "  $(bold 'Base Harness') v${HARNESS_VERSION}"
-echo "  Self-enforcing harness for Claude and Codex projects"
+echo "  Self-enforcing harness for AI coding assistants"
 echo ""
 
 # ─── Step 1: Prerequisites ────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ info "Project configuration"
 echo ""
 
 PRESET=$(prompt_choice "Stack preset" "vite | next-ts | vanilla-ts" "vite")
-ADAPTERS=$(prompt_choice "Adapter install" "claude | codex | both" "both")
+ADAPTERS=$(prompt_choice "Adapter install" "claude | codex | opencode | omx | all" "all")
 BUILD_CMD=$(prompt "Build check command" "yarn tsc --noEmit")
 LINT_CMD=$(prompt "Lint command" "npx eslint")
 SRC_DIR=$(prompt "Source directory" "src/")
@@ -201,7 +201,7 @@ cat > hooks/config.json << CONFIGEOF
   "archTriggerPaths": ${ARCH_JSON},
   "qaTriggerMinLines": 30,
   "debateLedger": "memory/debate/rounds.json",
-  "verifiedCompletePath": ".omc/state/verified-complete.json",
+  "verifiedCompletePath": "state/verified-complete.json",
   "qualityGate": {
     "minDiffLines": ${MIN_DIFF},
     "rejectWhitespaceOnly": true,
@@ -215,14 +215,21 @@ ok "hooks/config.json written"
 
 install_claude=false
 install_codex=false
+install_opencode=false
+install_omx=false
 case "$ADAPTERS" in
-  claude) install_claude=true ;;
-  codex)  install_codex=true ;;
-  both)   install_claude=true; install_codex=true ;;
+  claude)   install_claude=true ;;
+  codex)    install_codex=true ;;
+  opencode) install_opencode=true ;;
+  omx)      install_omx=true ;;
+  both)     install_claude=true; install_codex=true ;;
+  all)      install_claude=true; install_codex=true; install_opencode=true; install_omx=true ;;
   *)
-    warn "Unknown adapter choice '${ADAPTERS}' — defaulting to both"
+    warn "Unknown adapter choice '${ADAPTERS}' — defaulting to all"
     install_claude=true
     install_codex=true
+    install_opencode=true
+    install_omx=true
     ;;
 esac
 
@@ -248,6 +255,20 @@ if [[ "$install_claude" == true ]]; then
     fetch_file ".claude/settings.json" ".claude/settings.json"
   fi
   ok "Claude adapter ready"
+fi
+
+if [[ "$install_opencode" == true ]]; then
+  info "Installing OpenCode (OMO) adapter..."
+  mkdir -p .opencode
+  fetch_file ".opencode/settings.json" ".opencode/settings.json"
+  ok "OpenCode adapter ready"
+fi
+
+if [[ "$install_omx" == true ]]; then
+  info "Installing OMX adapter..."
+  mkdir -p .omx
+  fetch_file ".omx/settings.json" ".omx/settings.json"
+  ok "OMX adapter ready"
 fi
 
 if [[ "$install_codex" == true ]]; then
@@ -347,6 +368,12 @@ STAGE_TARGETS="hooks/ agents/ memory/ skills/ state/ AGENTS.md"
 if [[ "$install_claude" == true ]]; then
   STAGE_TARGETS="${STAGE_TARGETS} .claude/"
 fi
+if [[ "$install_opencode" == true ]]; then
+  STAGE_TARGETS="${STAGE_TARGETS} .opencode/"
+fi
+if [[ "$install_omx" == true ]]; then
+  STAGE_TARGETS="${STAGE_TARGETS} .omx/"
+fi
 if [[ "$install_codex" == true ]]; then
   STAGE_TARGETS="${STAGE_TARGETS} .codex/"
 fi
@@ -356,9 +383,15 @@ echo "    2. Stage:  $(bold "git add ${STAGE_TARGETS}")"
 if [[ "$install_claude" == true ]]; then
   echo "    3. Claude: open Claude Code — hooks are live via .claude/settings.json"
 fi
+if [[ "$install_opencode" == true ]]; then
+  echo "    4. OpenCode: hooks are live via .opencode/settings.json"
+fi
+if [[ "$install_omx" == true ]]; then
+  echo "    5. OMX: hooks are live via .omx/settings.json"
+fi
 if [[ "$install_codex" == true ]]; then
-  echo "    4. Codex: run ./.codex/commands/preflight.sh \"<task>\" before major work"
-  echo "    5. Codex: run ./.codex/commands/final-check.sh before you finish"
+  echo "    6. Codex: run ./.codex/commands/preflight.sh \"<task>\" before major work"
+  echo "    7. Codex: run ./.codex/commands/final-check.sh before you finish"
 fi
 echo ""
 DOCS_LINE="README.md, ARCHITECTURE.md"

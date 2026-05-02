@@ -1,6 +1,6 @@
 # Base Harness
 
-Self-enforcing harness for AI-assisted development. The shared core owns rules, memory, skills, debate state, and verification gates. Claude and Codex each get a thin adapter layer.
+Self-enforcing harness for AI-assisted development. The shared core owns rules, memory, skills, debate state, and verification gates. Each AI coding assistant (Claude, OpenCode, OMX, Codex) gets a thin adapter layer.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ curl -sSL https://raw.githubusercontent.com/jeongminsang/base-harness/main/boots
 bash bootstrap.sh
 ```
 
-The installer keeps `bootstrap.sh` as the single entrypoint and lets you install `claude`, `codex`, or `both`.
+The installer keeps `bootstrap.sh` as the single entrypoint and lets you install `claude`, `codex`, `opencode`, `omx`, or `all`.
 
 ## What Gets Installed
 
@@ -30,16 +30,18 @@ your-repo/
 ├── state/            # Canonical verifier artifact location
 ├── AGENTS.md         # Shared operator contract
 ├── .claude/          # Claude adapter: automatic hooks
+├── .opencode/        # OpenCode (OMO) adapter: automatic hooks
+├── .omx/             # OMX adapter: automatic hooks
 └── .codex/           # Codex adapter: explicit commands
 ```
 
 ## Quickstart
 
-### Claude
+### Claude / OpenCode (OMO) / OMX
 
-1. Install with the `claude` or `both` adapter option.
-2. Open Claude Code in the repo.
-3. Claude reads `.claude/settings.json` and runs the shared hook pipeline automatically.
+1. Install with the `claude`, `opencode`, `omx`, or `all` adapter option.
+2. Open the AI coding assistant in the repo.
+3. The assistant reads `.claude/settings.json`, `.opencode/settings.json`, or `.omx/settings.json` and runs the shared hook pipeline automatically.
 
 ### Codex
 
@@ -68,7 +70,7 @@ During migration, the harness still accepts the legacy `.omc/state/verified_comp
 
 Re-run `bootstrap.sh`. It is safe for update mode:
 
-- Existing `.claude/settings.json` files keep non-hook settings and get only the hook section refreshed.
+- Existing `.claude/settings.json`, `.opencode/settings.json`, `.omx/settings.json` files keep non-hook settings and get only the hook section refreshed.
 - Existing `AGENTS.md` files prompt before regeneration.
 - Re-running Codex install refreshes `.codex/commands/*` deterministically.
 

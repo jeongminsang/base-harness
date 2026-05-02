@@ -1,6 +1,6 @@
 ---
 persona: learner
-model: haiku
+tier: 1
 ---
 
 # learner — post-task mining persona

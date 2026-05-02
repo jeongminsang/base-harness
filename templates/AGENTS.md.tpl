@@ -7,7 +7,7 @@
 - **SLL**: Self-Learning Loop (auto-extraction of skills)
 - **CP / DP**: Control Plane (harness) / Data Plane (`{{SRC_DIR}}`)
 - **QG**: Quality Gate (validation before skill promotion)
-- **L/M/H**: Model Tiering (Haiku / Sonnet / Opus)
+- **L/M/H**: Model Tiering (T1=Light / T2=Balanced / T3=Max, see §4)
 - **SR**: System-Reminder (context injection pattern)
 - **V-Ev**: Verification Evidence (fresh logs required)
 
@@ -46,15 +46,42 @@
   - `notepad.md`: Short-term (STM). Survives compaction.
   - `project-memory.json`: Long-term (LTM) facts & metadata.
 
-## 4. Model Tiering & Agent Lanes
+## 4. Model Tiering & Platform Mapping
 
-| Tier | Model  | Agents                                    | Use Case                    |
-| ---- | ------ | ----------------------------------------- | --------------------------- |
-| LOW  | Haiku  | `explore`, `writer`, `learner`            | Lookup, Docs, SLL Mining    |
-| MED  | Sonnet | `executor`, `debugger`, `test-engineer`   | Implementation, Fixes, V-Ev |
-| HIGH | Opus   | `architect`, `planner`, `critic`, `reviewer` | Design, Strategy, QG Audit |
+### Tier Definitions
 
-**Execution Lanes:**
+Each harness persona declares its required capability tier in `agents/<persona>.md`:
+
+| Tier | Capability  | Harness Personas                        |
+|------|-------------|----------------------------------------|
+| 3    | Maximum     | architect, critic, reviewer            |
+| 2    | Balanced    | analyst, executor                      |
+| 1    | Lightweight | learner                                |
+
+### Platform Model Mapping
+
+Map each tier to your platform's available models:
+
+| Platform | Tier 3 (Max)         | Tier 2 (Balanced)    | Tier 1 (Light)       |
+|----------|----------------------|----------------------|----------------------|
+| OMC      | claude-opus-4-6      | claude-sonnet-4-6    | claude-haiku-4-5     |
+| OMO      | deepseek-v4-pro      | deepseek-v4          | deepseek-v4-mini     |
+| OMX      | (platform default)   | (platform default)   | (platform default)   |
+
+### Platform Agent Mapping
+
+When invoking a harness persona as a sub-agent, use the corresponding platform agent:
+
+| Persona   | Tier | OMO Agent   | OMC Agent        |
+|-----------|------|-------------|------------------|
+| architect | 3    | prometheus  | architect        |
+| critic    | 3    | oracle      | critic           |
+| reviewer  | 3    | momus       | code-reviewer    |
+| analyst   | 2    | prometheus  | analyst          |
+| executor  | 2    | hephaestus  | executor         |
+| learner   | 1    | explore     | learner          |
+
+### Execution Lanes
 1. **Analysis**: `explore` → `analyst` → `planner`
 2. **Review**: `critic` → `reviewer`
 3. **Action**: `executor` → `test-engineer` → `verifier`
@@ -139,7 +166,7 @@ PROPOSED → CHALLENGED → (REVISED) → CONSENSUS → executor implements
 
 ### Adapter Examples
 
-- Claude adapter: launch a fresh critic/verifier agent using your Claude sub-agent flow and `agents/critic.md` or `agents/reviewer.md`.
+- Claude / OMO / OMX adapter: launch a fresh critic/verifier agent using your sub-agent flow and `agents/critic.md` or `agents/reviewer.md`.
 - Codex adapter: spawn a fresh agent using the same persona files, then run `./.codex/commands/final-check.sh` after verification is recorded.
 
 ## 10. Codex Workflow
