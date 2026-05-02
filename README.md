@@ -1,6 +1,6 @@
 # Base Harness
 
-Self-enforcing harness for AI-assisted development. The shared core owns rules, memory, skills, debate state, and verification gates. Each AI coding assistant (Claude, OpenCode, OMX, Codex) gets a thin adapter layer.
+Self-enforcing harness for AI-assisted development. The shared core owns rules, memory, skills, debate state, and verification gates. Each AI coding assistant (OMC, OMO, OMX, Codex) gets a thin adapter layer.
 
 ## Prerequisites
 
@@ -29,15 +29,15 @@ your-repo/
 ├── skills/           # Pattern library
 ├── state/            # Canonical verifier artifact location
 ├── AGENTS.md         # Shared operator contract
-├── .claude/          # Claude adapter: automatic hooks
-├── .opencode/        # OpenCode (OMO) adapter: automatic hooks
+├── .claude/          # OMC adapter: automatic hooks
+├── .opencode/        # OMO adapter: automatic hooks
 ├── .omx/             # OMX adapter: automatic hooks
 └── .codex/           # Codex adapter: explicit commands
 ```
 
 ## Quickstart
 
-### Claude / OpenCode (OMO) / OMX
+### OMC / OMO / OMX
 
 1. Install with the `claude`, `opencode`, `omx`, or `all` adapter option.
 2. Open the AI coding assistant in the repo.
