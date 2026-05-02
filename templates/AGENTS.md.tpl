@@ -166,7 +166,7 @@ PROPOSED → CHALLENGED → (REVISED) → CONSENSUS → executor implements
 
 ### Adapter Examples
 
-- Claude / OMO / OMX adapter: launch a fresh critic/verifier agent using your sub-agent flow and `agents/critic.md` or `agents/reviewer.md`.
+- omc, omo, omx adapter: launch a fresh critic/verifier agent using your sub-agent flow and `agents/critic.md` or `agents/reviewer.md`.
 - Codex adapter: spawn a fresh agent using the same persona files, then run `./.codex/commands/final-check.sh` after verification is recorded.
 
 ## 10. Codex Workflow
