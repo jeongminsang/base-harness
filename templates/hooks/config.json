@@ -8,7 +8,7 @@
   "archTriggerPaths": ["src/pages/", "src/components/"],
   "qaTriggerMinLines": 30,
   "debateLedger": "memory/debate/rounds.json",
-  "verifiedCompletePath": "state/verified-complete.json",
+  "verifiedCompletePath": ".omc/state/verified-complete.json",
   "qualityGate": {
     "minDiffLines": 10,
     "rejectWhitespaceOnly": true,

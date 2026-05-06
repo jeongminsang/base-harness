@@ -138,7 +138,7 @@ info "Project configuration"
 echo ""
 
 PRESET=$(prompt_choice "Stack preset" "vite | next-ts | vanilla-ts" "vite")
-ADAPTERS=$(prompt_choice "Adapter install" "claude | codex | opencode | omx | all" "all")
+ADAPTERS=$(prompt_choice "Adapter install" "omc | omo | omx | all" "all")
 BUILD_CMD=$(prompt "Build check command" "yarn tsc --noEmit")
 LINT_CMD=$(prompt "Lint command" "npx eslint")
 SRC_DIR=$(prompt "Source directory" "src/")
@@ -214,20 +214,16 @@ ok "hooks/config.json written"
 # ─── Step 6: Install adapters ────────────────────────────────────────────────
 
 install_claude=false
-install_codex=false
 install_opencode=false
 install_omx=false
 case "$ADAPTERS" in
-  claude)   install_claude=true ;;
-  codex)    install_codex=true ;;
-  opencode) install_opencode=true ;;
+  omc)      install_claude=true ;;
+  omo)      install_opencode=true ;;
   omx)      install_omx=true ;;
-  both)     install_claude=true; install_codex=true ;;
-  all)      install_claude=true; install_codex=true; install_opencode=true; install_omx=true ;;
+  all)      install_claude=true; install_opencode=true; install_omx=true ;;
   *)
     warn "Unknown adapter choice '${ADAPTERS}' — defaulting to all"
     install_claude=true
-    install_codex=true
     install_opencode=true
     install_omx=true
     ;;
@@ -269,18 +265,6 @@ if [[ "$install_omx" == true ]]; then
   mkdir -p .omx
   fetch_file ".omx/settings.json" ".omx/settings.json"
   ok "OMX adapter ready"
-fi
-
-if [[ "$install_codex" == true ]]; then
-  info "Installing Codex adapter..."
-  mkdir -p .codex/commands
-  fetch_file ".codex/README.md" ".codex/README.md"
-  fetch_file ".codex/commands/preflight.sh" ".codex/commands/preflight.sh"
-  fetch_file ".codex/commands/post-task.sh" ".codex/commands/post-task.sh"
-  fetch_file ".codex/commands/final-check.sh" ".codex/commands/final-check.sh"
-  fetch_file ".codex/commands/mark-verified.sh" ".codex/commands/mark-verified.sh"
-  chmod +x .codex/commands/*.sh
-  ok "Codex adapter ready"
 fi
 
 # ─── Step 7: Generate AGENTS.md ───────────────────────────────────────────────
@@ -374,9 +358,6 @@ fi
 if [[ "$install_omx" == true ]]; then
   STAGE_TARGETS="${STAGE_TARGETS} .omx/"
 fi
-if [[ "$install_codex" == true ]]; then
-  STAGE_TARGETS="${STAGE_TARGETS} .codex/"
-fi
 echo "  Next steps:"
 echo "    1. Review $(bold 'AGENTS.md') — add your stack-specific notes"
 echo "    2. Stage:  $(bold "git add ${STAGE_TARGETS}")"
@@ -389,14 +370,7 @@ fi
 if [[ "$install_omx" == true ]]; then
   echo "    5. OMX: hooks are live via .omx/settings.json"
 fi
-if [[ "$install_codex" == true ]]; then
-  echo "    6. Codex: run ./.codex/commands/preflight.sh \"<task>\" before major work"
-  echo "    7. Codex: run ./.codex/commands/final-check.sh before you finish"
-fi
 echo ""
 DOCS_LINE="README.md, ARCHITECTURE.md"
-if [[ "$install_codex" == true ]]; then
-  DOCS_LINE="${DOCS_LINE}, .codex/README.md"
-fi
 echo "  Docs: ${DOCS_LINE}"
 echo ""
