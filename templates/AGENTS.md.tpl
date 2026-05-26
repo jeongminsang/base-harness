@@ -34,6 +34,12 @@
   - **L3**: Blocked. No override.
   - **L2**: Requires `// HARNESS-BYPASS: <reason>` comment to proceed.
 - **EVIDENCE-MANDATORY**: Any "Fix" or "Refactor" claim without fresh `{{BUILD_CMD}}` or `{{LINT_CMD}}` output is invalid.
+- **POST-CHECK** *(hard gate — applies to every task without exception)*:
+  Before reporting completion, run ALL of the following that apply to this codebase:
+  1. **Build**: `{{BUILD_CMD}}` → must exit 0, zero errors.
+  2. **Lint**: `{{LINT_CMD}}` on changed files → zero errors.
+  3. **Type-check**: if the project has a type checker (e.g. `tsc --noEmit`, `pyright`) → zero type errors.
+  Paste the actual command output inline. "It should work" without output = task NOT done.
 
 ## 3. Directory & Asset Protocol
 
@@ -90,7 +96,12 @@ When invoking a harness persona as a sub-agent, use the corresponding platform a
 
 - **NO-EVIDENCE = NO-SUCCESS**: `verifier` MUST reject claims without command output.
 - **FRESHNESS**: Evidence must be < 5 mins old.
-- **SCOPE**: Build pass + Test pass + Visual/Logic consistency check.
+- **SCOPE**: POST-CHECK (§2) pass + Test pass + Visual/Logic consistency check.
+- **CHECKLIST** (run in order before `state/verified-complete.json` is written):
+  - [ ] `{{BUILD_CMD}}` exits 0
+  - [ ] `{{LINT_CMD}}` exits 0 on changed files
+  - [ ] Type-checker exits 0 (if applicable)
+  - [ ] No new console errors / runtime exceptions observed
 - **ARTIFACT**: Canonical verification record is `state/verified-complete.json`.
 
 ## 6. Governance (The 5 Laws)

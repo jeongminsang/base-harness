@@ -294,38 +294,7 @@ else
   warn "AGENTS.md exists — skipping (update manually to reflect new stack info)"
 fi
 
-# ─── Step 8: Initialize memory/ ───────────────────────────────────────────────
-
-if [[ ! -d "memory" ]]; then
-  info "Initializing memory/..."
-  mkdir -p memory/debate
-
-  cat > memory/project-memory.json << MEMEOF
-{
-  "version": "0.1",
-  "facts": [
-    { "k": "preset",  "v": "${PRESET}" },
-    { "k": "build",   "v": "${BUILD_CMD}" },
-    { "k": "lint",    "v": "${LINT_CMD}" },
-    { "k": "srcDir",  "v": "${SRC_DIR}" }
-  ],
-  "skills": []
-}
-MEMEOF
-
-  printf '# Harness Notepad\n\n## Thinking Log\n' > memory/notepad.md
-
-  printf '{\n  "schema": "1.0",\n  "rounds": []\n}\n' > memory/debate/rounds.json
-  ok "memory/ initialized"
-fi
-
-if [[ ! -d "state" ]]; then
-  info "Initializing state/..."
-  mkdir -p state
-  ok "state/ initialized"
-fi
-
-# ─── Step 9: Initialize skills/ ───────────────────────────────────────────────
+# ─── Step 8: Initialize skills/ ───────────────────────────────────────────────
 
 if [[ ! -d "skills" ]]; then
   info "Initializing skills/..."
@@ -333,6 +302,39 @@ if [[ ! -d "skills" ]]; then
   fetch_file "skills/conventions/no-any-type/SKILL.md" "skills/conventions/no-any-type/SKILL.md"
   touch skills/fixes/.gitkeep
   ok "skills/ initialized"
+fi
+
+# ─── Step 9: Update .gitignore ────────────────────────────────────────────────
+
+GITIGNORE_ENTRIES=(
+  "# Harness runtime state (agent-generated, local only)"
+  "memory/debate/"
+  "memory/notepad.md"
+  "memory/project-memory.json"
+  "state/"
+)
+
+if [[ ! -f ".gitignore" ]]; then
+  touch .gitignore
+fi
+
+needs_update=false
+for entry in "${GITIGNORE_ENTRIES[@]}"; do
+  if ! grep -qxF "$entry" .gitignore 2>/dev/null; then
+    needs_update=true
+    break
+  fi
+done
+
+if [[ "$needs_update" == true ]]; then
+  info "Updating .gitignore with harness runtime paths..."
+  printf '\n' >> .gitignore
+  for entry in "${GITIGNORE_ENTRIES[@]}"; do
+    if ! grep -qxF "$entry" .gitignore 2>/dev/null; then
+      printf '%s\n' "$entry" >> .gitignore
+    fi
+  done
+  ok ".gitignore updated"
 fi
 
 # ─── Done ─────────────────────────────────────────────────────────────────────
@@ -348,7 +350,7 @@ printf "    %-14s %s\n" "Lint:"      "${LINT_CMD}"
 printf "    %-14s %s\n" "Src dir:"   "${SRC_DIR}"
 printf "    %-14s %s\n" "ARCH paths:" "${ARCH_PATHS_RAW}"
 echo ""
-STAGE_TARGETS="hooks/ agents/ memory/ skills/ state/ AGENTS.md"
+STAGE_TARGETS="hooks/ agents/ skills/ AGENTS.md"
 if [[ "$install_claude" == true ]]; then
   STAGE_TARGETS="${STAGE_TARGETS} .claude/"
 fi
