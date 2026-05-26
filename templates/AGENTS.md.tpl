@@ -1,3 +1,4 @@
+<!-- HARNESS:MANAGED:START -->
 # AGENTS.md — Base Harness
 
 > `VER: 1.1` · `PRESET: {{PRESET}}` · `STYLE: Lean/Condensed` · `MODE: Tool-Neutral`
@@ -200,3 +201,4 @@ Codex does not receive automatic hook events. Run these commands manually at the
 
 - `<remember>`: Temp (7 days). Store in `notepad.md`.
 - `<remember priority>`: Permanent. Store in `project-memory.json`.
+<!-- HARNESS:MANAGED:END -->

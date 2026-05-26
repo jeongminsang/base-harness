@@ -269,29 +269,44 @@ fi
 
 # ─── Step 7: Generate AGENTS.md ───────────────────────────────────────────────
 
-REGEN_AGENTS=false
-if [[ -f "AGENTS.md" ]]; then
-  if prompt_yn "AGENTS.md already exists. Regenerate?"; then
-    REGEN_AGENTS=true
-  fi
-fi
-
-if [[ ! -f "AGENTS.md" || "$REGEN_AGENTS" == true ]]; then
-  info "Generating AGENTS.md..."
+_render_agents_tpl() {
+  local tpl
   if [[ "$LOCAL_MODE" == true ]]; then
-    TPL=$(cat "$TEMPLATES_DIR/AGENTS.md.tpl")
+    tpl=$(cat "$TEMPLATES_DIR/AGENTS.md.tpl")
   else
-    TPL=$(curl -fsSL "$HARNESS_REPO_RAW/templates/AGENTS.md.tpl")
+    tpl=$(curl -fsSL "$HARNESS_REPO_RAW/templates/AGENTS.md.tpl")
   fi
-  printf '%s' "$TPL" \
+  printf '%s' "$tpl" \
     | sed "s|{{PRESET}}|${PRESET}|g" \
     | sed "s|{{BUILD_CMD}}|${BUILD_CMD}|g" \
     | sed "s|{{LINT_CMD}}|${LINT_CMD}|g" \
-    | sed "s|{{SRC_DIR}}|${SRC_DIR}|g" \
-    > AGENTS.md
+    | sed "s|{{SRC_DIR}}|${SRC_DIR}|g"
+}
+
+if [[ ! -f "AGENTS.md" ]]; then
+  info "Generating AGENTS.md..."
+  _render_agents_tpl > AGENTS.md
   ok "AGENTS.md generated"
+elif grep -q "<!-- HARNESS:MANAGED:START -->" AGENTS.md 2>/dev/null; then
+  info "Updating AGENTS.md harness-managed sections..."
+  _AGENTS_NEW=$(_render_agents_tpl)
+  _AGENTS_BEFORE=$(awk '/<!-- HARNESS:MANAGED:START -->/{exit} {print}' AGENTS.md)
+  _AGENTS_AFTER=$(awk '/<!-- HARNESS:MANAGED:END -->/{found=1; next} found{print}' AGENTS.md)
+  {
+    [[ -n "$_AGENTS_BEFORE" ]] && printf '%s\n' "$_AGENTS_BEFORE"
+    printf '%s\n' "$_AGENTS_NEW"
+    [[ -n "$_AGENTS_AFTER" ]] && printf '\n%s' "$_AGENTS_AFTER"
+  } > AGENTS.md
+  ok "AGENTS.md harness sections updated (user content preserved)"
 else
-  warn "AGENTS.md exists — skipping (update manually to reflect new stack info)"
+  warn "AGENTS.md exists without sentinel markers"
+  if prompt_yn "Regenerate fully? (user customizations will be lost)"; then
+    info "Regenerating AGENTS.md..."
+    _render_agents_tpl > AGENTS.md
+    ok "AGENTS.md regenerated"
+  else
+    warn "AGENTS.md skipped — re-run bootstrap after adding sentinels to update"
+  fi
 fi
 
 # ─── Step 8: Initialize skills/ ───────────────────────────────────────────────
