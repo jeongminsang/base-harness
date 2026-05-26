@@ -148,7 +148,8 @@ PROPOSED → CHALLENGED → (REVISED) → CONSENSUS → executor implements
 ### Ledger
 - All rounds: `memory/debate/rounds.json`
 - Schema: `{ id, task, state, proposal, challenges[], consensus }`
-- Completed rounds must never be deleted (audit trail)
+- Completed rounds must never be deleted (internal audit trail).
+- Note: `memory/` and `state/` are local runtime state and should be excluded from Git (see `.gitignore`).
 
 ### Agent Personas
 | Persona   | Model  | File                   | Role                           |

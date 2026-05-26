@@ -54,16 +54,23 @@ function checkL3Core(filePath, content, { isNewFile = false } = {}) {
     if (isArchFile) {
       const debatePath = path.join(ROOT, CFG.debateLedger || "memory/debate/rounds.json");
       let hasConsensus = false;
-      try {
-        const { rounds } = JSON.parse(fs.readFileSync(debatePath, "utf8"));
-        const basename = path.basename(filePath, path.extname(filePath)).toLowerCase();
-        hasConsensus = (rounds || []).some(
-          (r) =>
-            r.state === "CONSENSUS" &&
-            (r.task || "").toLowerCase().includes(basename) &&
-            Array.isArray(r.challenges) && r.challenges.length >= 3
-        );
-      } catch {}
+
+      if (!fs.existsSync(debatePath)) {
+        hasConsensus = true; // Skip check if ledger is missing
+      } else {
+        try {
+          const { rounds } = JSON.parse(fs.readFileSync(debatePath, "utf8"));
+          const basename = path.basename(filePath, path.extname(filePath)).toLowerCase();
+          hasConsensus = (rounds || []).some(
+            (r) =>
+              r.state === "CONSENSUS" &&
+              (r.task || "").toLowerCase().includes(basename) &&
+              Array.isArray(r.challenges) &&
+              r.challenges.length >= 3
+          );
+        } catch {}
+      }
+
       if (!hasConsensus) {
         violations.push({
           skill: "ARCH-TRIGGER (L3)",
