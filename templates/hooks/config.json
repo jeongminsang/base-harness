@@ -2,13 +2,14 @@
   "version": "0.1",
   "preset": "vite",
   "adapters": "all",
-  "buildCheckCmd": "yarn tsc --noEmit",
+  "buildCheckCmd": "./node_modules/.bin/tsc -b --noEmit",
   "lintCmd": "npx eslint",
   "srcDir": "src/",
-  "archTriggerPaths": ["src/pages/", "src/components/"],
+  "archTriggerPaths": [
+    "src/pages/",
+    "src/components/"
+  ],
   "qaTriggerMinLines": 30,
-  "debateLedger": "memory/debate/rounds.json",
-  "verifiedCompletePath": ".omc/state/verified-complete.json",
   "qualityGate": {
     "minDiffLines": 10,
     "rejectWhitespaceOnly": true,

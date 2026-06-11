@@ -5,7 +5,7 @@ tier: 1
 
 # learner — post-task mining persona
 
-- `INPUT`: `git diff HEAD` + `memory/notepad.md`.
+- `INPUT`: `git diff HEAD`.
 - `OUTPUT`: `skills/<bucket>/<slug>.draft.md` (NEVER `.md` directly).
 - `QG`: obey `hooks/config.json.qualityGate`.
 - `PROMOTE`: human reviews `.draft.md`, renames to `.md` to activate.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// pre-task.js — SLL Pre hook
-// USAGE: node hooks/pre-task.js "<task text>"
-// OUT:   cats top-K matching skill files to stdout, wrapped for CTX injection.
+// pre-task.cjs — SLL Pre hook
+// USAGE (CLI):  node hooks/pre-task.cjs "<task text>"
+// USAGE (Hook): stdin JSON -> JSON line output
 
 const fs = require("fs");
 const path = require("path");
@@ -10,25 +10,48 @@ const ROOT = path.resolve(__dirname, "..");
 const SKILLS = path.join(ROOT, "skills");
 const K = 3;
 
-// Adapter hook path: stdin JSON → tool_input 텍스트 추출
-// CLI/manual path: process.argv 그대로 사용
-let task = process.argv.slice(2).join(" ").toLowerCase();
-if (!task && !process.stdin.isTTY) {
+// Resolve CLI vs Hook mode
+const args = process.argv.slice(2);
+const isCliMode = args.length > 0;
+
+let task = "";
+let ti = {};
+
+if (isCliMode) {
+  task = args.join(" ").toLowerCase();
+} else {
+  // Hook mode
   try {
     const raw = fs.readFileSync("/dev/stdin", "utf8");
-    const payload = JSON.parse(raw);
-    const ti = payload.tool_input || {};
+    const payload = JSON.parse(raw || "{}");
+    ti = payload.tool_input || {};
     task = [
       ti.file_path || "",
       ti.content || "",
       ti.new_string || "",
       ti.command || "",
-    ].join(" ").toLowerCase();
-  } catch {}
+    ].join(" ").trim().toLowerCase();
+  } catch (e) {
+    // If parsing fails in hook mode, pass through
+    console.log(JSON.stringify({ continue: true }));
+    process.exit(0);
+  }
 }
-if (!task) {
-  console.error("[pre-task] no task text; exit.");
+
+// In hook mode, if file_path is present but it's a non-source file, pass through
+if (!isCliMode && ti.file_path && !/\.(tsx?|jsx?)$/.test(ti.file_path)) {
+  console.log(JSON.stringify({ continue: true }));
   process.exit(0);
+}
+
+if (!task) {
+  if (isCliMode) {
+    console.error("[pre-task] no task text; exit.");
+    process.exit(0);
+  } else {
+    console.log(JSON.stringify({ continue: true }));
+    process.exit(0);
+  }
 }
 
 function walk(dir, out = []) {
@@ -66,35 +89,36 @@ scored.sort((a, b) => b.score - a.score);
 const top = scored.slice(0, K);
 
 if (!top.length) {
-  console.error("[pre-task] no skill matched; exit.");
-  process.exit(0);
+  if (isCliMode) {
+    console.error("[pre-task] no skill matched; exit.");
+    process.exit(0);
+  } else {
+    console.log(JSON.stringify({ continue: true }));
+    process.exit(0);
+  }
 }
 
-console.log("<harness-ctx source=\"pre-task.js\">");
-for (const { file, score, txt } of top) {
-  console.log(`\n<!-- skill: ${path.relative(ROOT, file)} score=${score} -->`);
-  console.log(txt);
-}
+if (isCliMode) {
+  console.log("<harness-ctx source=\"pre-task.js\">");
+  for (const { file, score, txt } of top) {
+    console.log(`\n<!-- skill: ${path.relative(ROOT, file)} score=${score} -->`);
+    console.log(txt);
+  }
+  console.log("</harness-ctx>");
+} else {
+  // Hook mode JSON line output
+  let additionalContext = '<harness-ctx source="pre-task.js">';
+  for (const { file, score, txt } of top) {
+    const truncatedTxt = txt.length > 4000 ? txt.slice(0, 4000) + "\n...[truncated]" : txt;
+    additionalContext += `\n<!-- skill: ${path.relative(ROOT, file)} score=${score} -->\n${truncatedTxt}`;
+  }
+  additionalContext += '\n</harness-ctx>';
 
-// Debate round injection
-const DEBATE = path.join(ROOT, "memory", "debate", "rounds.json");
-if (fs.existsSync(DEBATE)) {
-  try {
-    const { rounds } = JSON.parse(fs.readFileSync(DEBATE, "utf8"));
-    const open = (rounds || []).filter(r => r.state !== "CONSENSUS");
-    if (open.length > 0) {
-      console.log("\n<!-- debate-active-rounds -->");
-      for (const r of open) {
-        const challengeLines = (r.challenges || []).flatMap(c =>
-          (c.points || []).map(p => `  - ${p}`)
-        ).join("\n");
-        console.log(`[DEBATE-ACTIVE] round-${r.id} state=${r.state}
-task: ${r.task}
-proposal: ${r.proposal ? r.proposal.content : "(none)"}
-challenges:\n${challengeLines || "  (none yet)"}`);
-      }
+  console.log(JSON.stringify({
+    continue: true,
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      additionalContext
     }
-  } catch {}
+  }));
 }
-
-console.log("</harness-ctx>");

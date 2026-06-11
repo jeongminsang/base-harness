@@ -9,7 +9,6 @@ hooks/                        .claude/
 agents/                       .opencode/
 skills/                       .omx/
 memory/                       .codex/
-state/
 AGENTS.md
 ```
 
@@ -24,14 +23,11 @@ AGENTS.md
 
 The shared core defines:
 
-- L3/L2 rule checks
-- Debate ledger state in `memory/debate/rounds.json`
-- Skill mining and draft generation
-- Build/lint gates
-- Final verification gate
-- Canonical success artifact in `state/verified-complete.json`
+- L3/L2 rule checks.
+- Skill mining and draft generation.
+- Build/lint gates.
 
-The legacy `.omc/state/verified_complete.json` path is read only for backward compatibility during migration.
+Deterministic checks are run automatically under the pre-commit hook and stop hook, preventing incorrect/unverified code from being integrated.
 
 ## 3. OpenCode-based Adapters (Claude / OMO / OMX)
 
@@ -42,53 +38,35 @@ Claude, OpenCode (OMO), and OMX share the same hook event API. Each uses automat
 - OMX: `.omx/settings.json`
 
 - `PreToolUse` → `hooks/pre-tool-enforcer.cjs`, `hooks/pre-task.cjs`
-- `PostToolUse` for writes/edits → `hooks/post-task.cjs`
 - `PostToolUse` for bash → `hooks/post-bash-verifier.cjs`
 - `Stop` → `hooks/stop-enforcer.cjs`
-
-These adapters are the only place that depends on hook event names (shared across all OpenCode-based platforms).
+- Git Hook: `hooks/git/pre-commit` triggers the final gate checks and skill mining.
 
 ## 4. Codex Adapter
 
 Unlike the OpenCode-based platforms, Codex uses explicit commands instead of automatic hooks:
 
-- `./.codex/commands/preflight.sh "task summary"`
-- `./.codex/commands/post-task.sh`
-- `./.codex/commands/mark-verified.sh <files...>`
-- `./.codex/commands/final-check.sh`
-
-These commands call the same shared Node entrypoints used by the Claude adapter where possible.
+- `preflight.sh` loads matching skills.
+- `final-check.sh` runs the final gate.
+- Note: Post-task mining is automatically triggered during git pre-commit, making manual post-task execution optional.
 
 ## 5. Final Gate
 
-The final gate is shared by both tools.
+The final gate runs the same deterministic validation.
 
 Gate order:
 
-1. No open `PROPOSED` debate rounds.
-2. No L3 violations in changed source files.
-3. `buildCheckCmd` passes.
-4. `lintCmd` passes on changed files.
-5. Verification artifact covers all changed files.
+1. No L3 violations in changed source files.
+2. `buildCheckCmd` passes.
+3. `lintCmd` passes on changed files.
 
-Claude / OMO / OMX reach this through `hooks/stop-enforcer.cjs`. Codex reaches it through `hooks/run-final-check.cjs`.
+Stop hook and pre-commit hook run the exact same gate pipeline.
 
-## 6. Deliberation Protocol
+## 6. Review (fresh-context)
 
-State machine:
-
-```text
-PROPOSED → CHALLENGED → (REVISED) → CONSENSUS → executor implements
-```
-
-Rules:
-
-- `architect` writes `PROPOSED`
-- `critic` must provide at least three challenge points
-- `analyst` finalizes `CONSENSUS`
-- `executor` does not implement guarded architecture work before `CONSENSUS`
-
-The anti-self-consistency rule is shared: the critic must run in a fresh agent context rather than inline in the same reasoning thread.
+- The debate ledger (rounds.json) has been completely removed to prevent self-signed approval loops.
+- Large changes or structural proposals should be reviewed in a fresh context (no conversation history) using `/code-review` or a standalone code reviewer agent.
+- A soft reminder is shown during the stop hook if uncommitted changes to guarded paths exceed the line limit.
 
 ## 7. Skill System
 
@@ -99,21 +77,40 @@ skills/
         └── SKILL.md
 ```
 
-- L3: hard block
-- L2: pattern block unless justified
-- L1: guidance only
+- L3: hard block.
+- L2: pattern block unless justified.
+- L1: guidance only.
 
-`post-task.cjs` writes `*.draft.md` files only. Human promotion is still required to activate a skill.
+### SLL Promotion Ladder
+```text
+commit → pre-commit mining (.draft.md)        [자동, 커밋당 1회]
+       → 사람 승격: .draft.md → SKILL.md       [수동 게이트]
+       → L1/L2: pre-task 컨텍스트 주입
+       → L3 승격 기준: ① 위반 반복 관찰 + ② 정규식 검출 가능 → preset l3-rules에 추가
+       → 정규식 불가 패턴: SKILL.md + /code-review 담당
+```
 
 ## 8. Config
 
-`hooks/config.json` remains the shared runtime contract. New keys:
+`hooks/config.json` remains the shared runtime contract:
 
 ```json
 {
-  "adapters": "both",
-  "verifiedCompletePath": "../state/verified-complete.json"
+  "version": "0.1",
+  "preset": "vite",
+  "adapters": "all",
+  "buildCheckCmd": "./node_modules/.bin/tsc -b --noEmit",
+  "lintCmd": "npx eslint",
+  "srcDir": "src/",
+  "archTriggerPaths": [
+    "src/pages/",
+    "src/components/"
+  ],
+  "qaTriggerMinLines": 30,
+  "qualityGate": {
+    "minDiffLines": 10,
+    "rejectWhitespaceOnly": true,
+    "rejectIfDuplicateSkill": true
+  }
 }
 ```
-
-Older installs can keep working because the verifier gate still reads the legacy `.omc` artifact path as a fallback.

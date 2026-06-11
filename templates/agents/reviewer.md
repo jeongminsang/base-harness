@@ -7,9 +7,8 @@ tier: 3
 
 ## Harness Audit (SKILL-SCAN + Event-SLL)
 - **Check 0**: Did the agent declare `"Active Skills: [...]"` on action turns? (Read-only turns are exempt.)
-- **Check 1**: Does `memory/notepad.md` Thinking Log contain entries for major Write/Edit/Bash decisions?
-- **Check 2**: Was `[SLL-PROPOSE]` output when a New Wisdom or Error Recovery event occurred?
-- If Check 0 or Check 1 is NO, **REJECT** immediately.
+- **Check 1**: Was `[SLL-PROPOSE]` output when a New Wisdom or Error Recovery event occurred?
+- If Check 0 is NO, **REJECT** immediately.
 
 ## Read order
 1. `AGENTS.md` §7 + §7.1 (Level-Based Enforcement table).

@@ -19,12 +19,10 @@ function checkL3(filePath, content, { isNewFile = false } = {}) {
   const violations = [];
   const clean = stripComments(content);
 
-  // [L3] api-error-handling — direct axios/fetch calls
   let CFG = {};
   try { CFG = JSON.parse(fs.readFileSync(path.join(ROOT, "hooks/config.json"), "utf8")); } catch {}
   const srcDir = CFG.srcDir || "src/";
-  const httpUtil = path.join(srcDir, "utills/http.");
-  const isHttpUtil = filePath.includes(httpUtil) || filePath.includes("utills/http.");
+  const isHttpUtil = /ut(il|ill)s\/http\./.test(filePath);
   const isTestFile = /\.(test|spec)\.(tsx?|jsx?)$/.test(filePath);
 
   if (!isHttpUtil && !isTestFile && /\baxios\s*\.|(?<!\w)fetch\s*\(/.test(clean)) {

@@ -1,7 +1,7 @@
 <!-- HARNESS:MANAGED:START -->
 # AGENTS.md — Base Harness
 
-> `VER: 1.1` · `PRESET: {{PRESET}}` · `STYLE: Lean/Condensed` · `MODE: Tool-Neutral`
+> `VER: 2.0.0` · `PRESET: {{PRESET}}` · `STYLE: Lean/Condensed` · `MODE: Tool-Neutral`
 
 ## 0. Glossary
 
@@ -14,7 +14,7 @@
 
 ## 1. System Architecture
 
-- **CTRL (CP)**: `skills/`, `hooks/`, `memory/`, `state/`, `agents/`, `AGENTS.md`. Owner: Harness.
+- **CTRL (CP)**: `skills/`, `hooks/`, `agents/`, `AGENTS.md`, `memory/project-memory.json`. Owner: Harness.
 - **DATA (DP)**: `{{SRC_DIR}}`. Owner: App Logic. Harness MUST NOT edit without `executor` persona.
 - **H1 (Harness-First)**: Every task starts with Harness Sync. Update/Create `SKILL.md` *BEFORE* touching `{{SRC_DIR}}`.
 - **SEP**: Harness logic is root-level. App logic is `{{SRC_DIR}}`-scoped. No cross-pollution.
@@ -23,7 +23,6 @@
 ## 2. RULES — ENFORCEMENT
 
 - **SKILL-SCAN**: At the start of any action turn, scan SKILL.md files whose `triggers` overlap the task. Declare `"Active Skills: [ids]"`. Read-only turns are exempt.
-- **LOG-BEFORE-ACT**: Before any Write/Edit/Bash call, append one line to `memory/notepad.md` — `- [TOOL] why: <reason> / rule-check: <skill-id or none>`.
 - **EVENT-SLL**: Propose knowledge capture when either event fires:
   - **New Wisdom**: New pattern established (diff ≥ 10 LOC + logic change + not duplicate)
   - **Structural Pattern**: New directory/module boundary created
@@ -49,9 +48,10 @@
   - `level`: `1` Guidance · `2` Pattern · `3` Hard-Rule
   - Structure: **Triggers → Context → Best Practices → Anti-Patterns**
 - **Action Hooks**: `hooks/` (zero-dep Node `.cjs` scripts)
-- **Persistence**: `memory/`
-  - `notepad.md`: Short-term (STM). Survives compaction.
-  - `project-memory.json`: Long-term (LTM) facts & metadata.
+- **Persistence**:
+  - `skills/` (pre-task 컨텍스트 주입)
+  - `memory/project-memory.json` (채굴 메타)
+  - 플랫폼 자동 메모리 (장기 사실)
 
 ## 4. Model Tiering & Platform Mapping
 
@@ -79,14 +79,14 @@ Map each tier to your platform's available models:
 
 When invoking a harness persona as a sub-agent, use the corresponding platform agent:
 
-| Persona   | Tier | OMO Agent   | OMC Agent        |
-|-----------|------|-------------|------------------|
-| architect | 3    | prometheus  | architect        |
-| critic    | 3    | oracle      | critic           |
-| reviewer  | 3    | momus       | code-reviewer    |
-| analyst   | 2    | prometheus  | analyst          |
-| executor  | 2    | hephaestus  | executor         |
-| learner   | 1    | explore     | learner          |
+| Persona   | Tier | OMO Agent   | OMC Agent        | Role |
+|-----------|------|-------------|------------------|------|
+| architect | 3    | prometheus  | architect        | 설계안 직접 반환, 대규모 설계는 fresh-context 리뷰 권고 |
+| critic    | 3    | oracle      | critic           | 명시적 리뷰 요청 시 fresh-context로 리뷰 보고 직접 반환 |
+| analyst   | 2    | prometheus  | analyst          | 제안과 리뷰가 충돌할 때 명시적 호출, 보고 반환 |
+| executor  | 2    | hephaestus  | executor         | 구현 담당. 채굴은 git pre-commit이 자동 실행 |
+| reviewer  | 3    | momus       | code-reviewer    | 코드 검증 및 최종 스킬 준수 여부 감사 |
+| learner   | 1    | explore     | learner          | 히스토리 피드백 및 학습 담당 |
 
 ### Execution Lanes
 1. **Analysis**: `explore` → `analyst` → `planner`
@@ -98,12 +98,7 @@ When invoking a harness persona as a sub-agent, use the corresponding platform a
 - **NO-EVIDENCE = NO-SUCCESS**: `verifier` MUST reject claims without command output.
 - **FRESHNESS**: Evidence must be < 5 mins old.
 - **SCOPE**: POST-CHECK (§2) pass + Test pass + Visual/Logic consistency check.
-- **CHECKLIST** (run in order before `state/verified-complete.json` is written):
-  - [ ] `{{BUILD_CMD}}` exits 0
-  - [ ] `{{LINT_CMD}}` exits 0 on changed files
-  - [ ] Type-checker exits 0 (if applicable)
-  - [ ] No new console errors / runtime exceptions observed
-- **ARTIFACT**: Canonical verification record is `state/verified-complete.json`.
+- **AUTO-GATES**: Stop 훅 + git pre-commit이 L3→tsc→eslint를 자동 강제한다. 모델이 쓸 수 있는 검증 아티팩트는 존재하지 않는다.
 
 ## 6. Governance (The 5 Laws)
 
@@ -123,83 +118,32 @@ When invoking a harness persona as a sub-agent, use the corresponding platform a
 
 ## 7. Self-Learning Loop (SLL)
 
+Event → [SLL-PROPOSE] → User Approve → skills/<cat>/<id>/SKILL.md
+
+### 승격 사다리
+```text
+commit → pre-commit mining (.draft.md)        [자동, 커밋당 1회]
+       → 사람 승격: .draft.md → SKILL.md       [수동 게이트]
+       → L1/L2: pre-task 컨텍스트 주입
+       → L3 승격 기준: ① 위반 반복 관찰 + ② 정규식 검출 가능 → preset l3-rules에 추가
+       → 정규식 불가 패턴: SKILL.md + /code-review 담당
 ```
-Event → [SLL-PROPOSE] → User Approve → skills/<cat>/<id>/SKILL.md → verifier V-Ev
-Post-task: git diff → QG → skills/*.draft.md → human promote → SKILL.md
-```
 
-## 8. Deliberation Protocol
+## 8. Review (Anti-Self-Consistency)
 
-### State Machine
-```
-PROPOSED → CHALLENGED → (REVISED) → CONSENSUS → executor implements
-```
+- **디베이트 레저 제거**: 셀프 도장 실증으로 구조적 무력화가 확인되어 기존의 디베이트 상태 파일(rounds.json 등)은 완전히 삭제됨.
+- **fresh-context 리뷰**: 설계안이나 대규모 변경은 대화 히스토리 없이 변경 코드(diff)와 스킬 파일만 전달하여 `/code-review` 또는 별도 reviewer 에이전트로 수행해야 함.
+- **Stop 리마인더**: Stop 훅 게이트 통과 시 주요 경로에 미커밋 변경이 `qaTriggerMinLines`(기본 30)줄 이상 있을 경우 차단 없이 `/code-review`를 권고하는 메시지를 띄움.
 
-### Trigger Conditions
-- **ARCH-TRIGGER**: New file in `archTriggerPaths` (see `hooks/config.json`)
-- **QA-TRIGGER**: Bug fix or refactoring ≥ 30 LOC change
-
-### Debate Rules
-- `architect`: PROPOSED record mandatory — BEFORE executor starts
-- `critic`: Min 3 challenge points, each with alternative code
-- `analyst`: Quote evidence from both sides before CONSENSUS
-- **Executor cannot start without CONSENSUS under ARCH-TRIGGER**
-
-### Ledger
-- All rounds: `memory/debate/rounds.json`
-- Schema: `{ id, task, state, proposal, challenges[], consensus }`
-- Completed rounds must never be deleted (internal audit trail).
-- Note: `memory/` and `state/` are local runtime state and should be excluded from Git (see `.gitignore`).
-
-### Agent Personas
-| Persona   | Model  | File                   | Role                           |
-|-----------|--------|------------------------|--------------------------------|
-| architect | Opus   | `agents/architect.md`  | Propose design → PROPOSED      |
-| critic    | Opus   | `agents/critic.md`     | Attack design → CHALLENGED     |
-| analyst   | Sonnet | `agents/analyst.md`    | Finalize → CONSENSUS           |
-| executor  | Sonnet | `agents/executor.md`   | Implement under CONSENSUS      |
-| reviewer  | Opus   | `agents/reviewer.md`   | Final skill compliance audit   |
-
-## 9. Delegation Enforcement (Anti-Self-Consistency)
-
-**Rule**: If `memory/debate/rounds.json` has `state: "PROPOSED"`:
-
-1. **PROHIBITED**: inline critic analysis in current context
-2. **REQUIRED**:
-   ```
-   Launch a fresh `critic` agent with:
-   - the proposal content
-   - relevant skills only
-   - no full conversation history
-   ```
-3. Critic updates round to `state: "CHALLENGED"` with ≥3 challenges
-4. Analyst may only finalize CONSENSUS after CHALLENGED is confirmed
-
-**Reason**: Proposer performing critic role in same context → self-consistency bias.
-
-### Adapter Examples
-
-- OMC, OMO, OMX adapter: launch a fresh critic/verifier agent using your sub-agent flow and `agents/critic.md` or `agents/reviewer.md`.
-- Codex adapter: spawn a fresh agent using the same persona files, then run `./.codex/commands/final-check.sh` after verification is recorded.
-
-## 10. Codex Workflow
+## 9. Codex Workflow
 
 Codex does not receive automatic hook events. Run these commands manually at the indicated points:
 
 | When | Command | What it does |
 |------|---------|--------------|
-| Before major work | `./.codex/commands/preflight.sh "<task summary>"` | Loads matching skills + flags open debate rounds |
-| After substantial edits | `./.codex/commands/post-task.sh` | Drafts skills from git diff, creates ARCH-TRIGGER debate rounds |
-| After verifying output | `./.codex/commands/mark-verified.sh <files...>` | Records verification artifact in `state/verified-complete.json` |
-| Before finishing | `./.codex/commands/final-check.sh` | Runs full gate: debate → L3 → build → lint → verification (must exit 0) |
+| Before major work | `./.codex/commands/preflight.sh "<task summary>"` | Loads matching skills |
+| Before finishing | `./.codex/commands/final-check.sh` | Runs full gate: L3 → tsc → eslint (must exit 0) |
 
 **Rules:**
 - `final-check.sh` **must pass** before a task is considered done. A non-zero exit is a hard block.
-- `mark-verified.sh` must be run with all changed source files as arguments before `final-check.sh`.
-- If `preflight.sh` reports open `PROPOSED` debate rounds, resolve them via the deliberation protocol (§8) before implementing.
-
-## 11. Persistent Memory Tags
-
-- `<remember>`: Temp (7 days). Store in `notepad.md`.
-- `<remember priority>`: Permanent. Store in `project-memory.json`.
 <!-- HARNESS:MANAGED:END -->

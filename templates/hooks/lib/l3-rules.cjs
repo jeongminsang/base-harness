@@ -13,9 +13,6 @@ let CFG = {};
 try { CFG = JSON.parse(fs.readFileSync(path.join(__dirname, "../config.json"), "utf8")); } catch {}
 
 // Load preset plugin
-// Priority: hooks/lib/l3-preset.cjs (bootstrap copies selected preset here)
-//           harness/presets/<id>/l3-rules.cjs (source repo)
-//           fallback: no-op stubs
 const preset = (() => {
   const local = path.join(__dirname, "l3-preset.cjs");
   if (fs.existsSync(local)) return require(local);
@@ -41,46 +38,6 @@ function checkL3Core(filePath, content, { isNewFile = false } = {}) {
       skill: "no-any-type (L3)",
       detail: "`any` type detected. Use `unknown` or an explicit type.",
     });
-  }
-
-  // [L3] ARCH-TRIGGER — config-driven paths
-  if (isNewFile) {
-    const archPaths = CFG.archTriggerPaths || ["src/pages/", "src/components/"];
-    const absPath = path.isAbsolute(filePath) ? filePath : path.join(ROOT, filePath);
-    const isArchFile = archPaths.some((p) =>
-      absPath.replace(/\\/g, "/").includes(p)
-    );
-
-    if (isArchFile) {
-      const debatePath = path.join(ROOT, CFG.debateLedger || "memory/debate/rounds.json");
-      let hasConsensus = false;
-
-      if (!fs.existsSync(debatePath)) {
-        hasConsensus = true; // Skip check if ledger is missing
-      } else {
-        try {
-          const { rounds } = JSON.parse(fs.readFileSync(debatePath, "utf8"));
-          const basename = path.basename(filePath, path.extname(filePath)).toLowerCase();
-          hasConsensus = (rounds || []).some(
-            (r) =>
-              r.state === "CONSENSUS" &&
-              (r.task || "").toLowerCase().includes(basename) &&
-              Array.isArray(r.challenges) &&
-              r.challenges.length >= 3
-          );
-        } catch {}
-      }
-
-      if (!hasConsensus) {
-        violations.push({
-          skill: "ARCH-TRIGGER (L3)",
-          detail:
-            `New file detected in guarded path: ${path.basename(filePath)}. ` +
-            `Add a CONSENSUS entry (challenges.length >= 3) to memory/debate/rounds.json first. ` +
-            `Sparse challenges array means critic Agent was not invoked.`,
-        });
-      }
-    }
   }
 
   return violations;

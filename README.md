@@ -1,6 +1,6 @@
 # Base Harness
 
-Self-enforcing harness for AI-assisted development. The shared core owns rules, memory, skills, debate state, and verification gates. Each AI coding assistant (OMC, OMO, OMX, Codex) gets a thin adapter layer.
+Self-enforcing harness for AI-assisted development. The shared core owns rules, memory, skills, and verification gates. Each AI coding assistant (OMC, OMO, OMX, Codex) gets a thin adapter layer.
 
 ## Prerequisites
 
@@ -17,54 +17,46 @@ curl -sSL https://raw.githubusercontent.com/jeongminsang/base-harness/main/boots
 bash bootstrap.sh
 ```
 
-The installer keeps `bootstrap.sh` as the single entrypoint and lets you install `claude`, `codex`, `opencode`, `omx`, or `all`.
+The installer keeps `bootstrap.sh` as the single entrypoint and lets you install `omc`, `omo`, `omx`, `codex`, or `all`.
 
 ## What Gets Installed
 
 ```text
 your-repo/
 ├── hooks/            # Shared enforcement scripts
+│   └── git/          # Git hook files (pre-commit)
 ├── agents/           # Shared personas
-├── memory/           # Debate ledger + notepad + project facts
+├── memory/
+│   └── project-memory.json # Mined skill meta facts
 ├── skills/           # Pattern library
-├── state/            # Canonical verifier artifact location
-├── AGENTS.md         # Shared operator contract
-├── .claude/          # OMC adapter: automatic hooks
-├── .opencode/        # OMO adapter: automatic hooks
-├── .omx/             # OMX adapter: automatic hooks
-└── .codex/           # Codex adapter: explicit commands
+└── AGENTS.md         # Shared operator contract
 ```
+
+Note: Optional adapter configurations like `.claude/`, `.opencode/`, `.omx/`, or `.codex/` will be created depending on the installed adapters.
 
 ## Quickstart
 
 ### OMC / OMO / OMX
 
-1. Install with the `claude`, `opencode`, `omx`, or `all` adapter option.
+1. Install with the `omc`, `omo`, `omx`, or `all` adapter option.
 2. Open the AI coding assistant in the repo.
 3. The assistant reads `.claude/settings.json`, `.opencode/settings.json`, or `.omx/settings.json` and runs the shared hook pipeline automatically.
 
 ### Codex
 
-1. Install with the `codex` or `both` adapter option.
-2. Before substantial work, run:
+1. Install with the `codex` or `all` adapter option.
+2. Before major work, run:
    ```bash
    ./.codex/commands/preflight.sh "task summary"
    ```
-3. After substantial edits, run:
+3. After finishing, run:
    ```bash
-   ./.codex/commands/post-task.sh
-   ```
-4. After verification, record the verified files and run the final gate:
-   ```bash
-   ./.codex/commands/mark-verified.sh src/example.ts src/example.test.ts
    ./.codex/commands/final-check.sh
    ```
 
-## Canonical Verification State
+## Commit Gate
 
-The canonical success marker is `state/verified-complete.json`.
-
-During migration, the harness still accepts the legacy `.omc/state/verified_complete.json` file if it already exists, but new installs and new verifier writes should use `state/verified-complete.json`.
+Deterministic checks (L3 scan → tsc → eslint) are enforced automatically via Stop hook and git pre-commit. No verification state files are written or reviewed by models.
 
 ## Update
 

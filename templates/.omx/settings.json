@@ -19,16 +19,6 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node hooks/post-task.cjs",
-            "timeout": 15
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -46,7 +36,7 @@
           {
             "type": "command",
             "command": "node hooks/stop-enforcer.cjs",
-            "timeout": 10
+            "timeout": 120
           }
         ]
       }

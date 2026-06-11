@@ -8,15 +8,10 @@ Codex does not use Claude's automatic hook API, so this adapter provides explici
 ./.codex/commands/preflight.sh "task summary"
 ./.codex/commands/post-task.sh
 ./.codex/commands/final-check.sh
-./.codex/commands/mark-verified.sh src/file-a.ts src/file-b.tsx
 ```
 
 ## Workflow
 
-1. Run `preflight.sh` before major implementation work to load matching skills and open debate rounds.
-2. Run `post-task.sh` after substantial edits to draft skills and create debate rounds for `ARCH-TRIGGER` paths.
-3. Run your build, lint, and task-specific verification.
-4. Record the verified files with `mark-verified.sh`.
-5. Run `final-check.sh` before finishing.
-
-The canonical verification artifact is `state/verified-complete.json`. During migration, the harness still accepts legacy `.omc/state/verified-complete.json` and `.omc/state/verified_complete.json` files if they already exist.
+1. Run `preflight.sh` before major implementation work to load matching skills.
+2. Run your build, lint, and task-specific verification. (Note: `post-task.sh` is automatically run during git pre-commit, so manual invocation is optional).
+3. Run `final-check.sh` before finishing.

@@ -30,44 +30,6 @@ if (QG.rejectWhitespaceOnly && addRm.every(l => /^[+-]\s*$/.test(l))) {
 }
 
 const files = [...diff.matchAll(/^\+\+\+ b\/(\S+)/gm)].map(m => m[1]);
-const crypto = require("crypto");
-
-// ARCH-TRIGGER
-const ARCH_PATHS = CFG.archTriggerPaths || [`${SRC_DIR}pages/`, `${SRC_DIR}components/`];
-const isArchTrigger = files.some(f => ARCH_PATHS.some(p => f.startsWith(p)));
-if (isArchTrigger) {
-  const DEBATE = path.join(ROOT, CFG.debateLedger || "memory/debate/rounds.json");
-  let ledger = { schema: "1.0", rounds: [] };
-  if (fs.existsSync(DEBATE)) { try { ledger = JSON.parse(fs.readFileSync(DEBATE, "utf8")); } catch {} }
-
-  // Idempotency check: hash the diff to see if this proposal already exists
-  const diffHash = crypto.createHash("sha1").update(diff).digest("hex");
-  const alreadyProposed = ledger.rounds.some(r =>
-    r.proposal && r.proposal.diffHash === diffHash && r.state !== "CONSENSUS"
-  );
-
-  if (alreadyProposed) {
-    console.error("[post-task] debate proposal already exists; skipping.");
-  } else {
-    const commit = sh("git rev-parse --short HEAD").trim();
-    const id = String(ledger.rounds.length + 1).padStart(3, "0");
-    ledger.rounds.push({
-      id,
-      task: `post-task auto @ ${commit}`,
-      state: "PROPOSED",
-      proposal: {
-        agent: "architect",
-        content: lines.slice(0, 40).join("\n"),
-        diffHash,
-      },
-      challenges: [],
-      consensus: null,
-    });
-    fs.mkdirSync(path.dirname(DEBATE), { recursive: true });
-    fs.writeFileSync(DEBATE, JSON.stringify(ledger, null, 2));
-    console.log(`[post-task] debate round-${id} created (PROPOSED)`);
-  }
-}
 
 // Heuristic bucket matching — driven by srcDir
 let bucket = null, slug = null, triggers = [];

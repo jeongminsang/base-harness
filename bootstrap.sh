@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-HARNESS_VERSION="1.1.0"
+HARNESS_VERSION="2.0.0"
 HARNESS_BRANCH="main"
 HARNESS_REPO_RAW="https://raw.githubusercontent.com/jeongminsang/base-harness/${HARNESS_BRANCH}"
 
@@ -130,6 +130,18 @@ if [[ -d "hooks" && -f "hooks/config.json" ]]; then
   fi
 fi
 
+if [[ "$UPDATE_MODE" == true ]]; then
+  info "Cleaning up legacy harness paths and files..."
+  rm -rf memory/debate/
+  rm -f memory/notepad.md
+  rm -f hooks/write-verified-complete.cjs
+  rm -f .codex/commands/mark-verified.sh
+  rm -f state/verified-complete.json
+  rm -f .omc/state/verified-complete.json
+  rm -f .omc/state/verified_complete.json
+  ok "Legacy files cleaned up"
+fi
+
 echo ""
 
 # ─── Step 2: Interactive configuration ───────────────────────────────────────
@@ -138,8 +150,8 @@ info "Project configuration"
 echo ""
 
 PRESET=$(prompt_choice "Stack preset" "vite | next-ts | vanilla-ts" "vite")
-ADAPTERS=$(prompt_choice "Adapter install" "omc | omo | omx | all" "all")
-BUILD_CMD=$(prompt "Build check command" "yarn tsc --noEmit")
+ADAPTERS=$(prompt_choice "Adapter install" "omc | omo | omx | codex | all" "all")
+BUILD_CMD=$(prompt "Build check command" "./node_modules/.bin/tsc -b --noEmit")
 LINT_CMD=$(prompt "Lint command" "npx eslint")
 SRC_DIR=$(prompt "Source directory" "src/")
 ARCH_PATHS_RAW=$(prompt "ARCH-TRIGGER paths (comma-separated)" "src/pages/,src/components/")
@@ -168,11 +180,41 @@ fetch_file "hooks/post-task.cjs"            "hooks/post-task.cjs"
 fetch_file "hooks/post-bash-verifier.cjs"   "hooks/post-bash-verifier.cjs"
 fetch_file "hooks/stop-enforcer.cjs"        "hooks/stop-enforcer.cjs"
 fetch_file "hooks/run-final-check.cjs"      "hooks/run-final-check.cjs"
-fetch_file "hooks/write-verified-complete.cjs" "hooks/write-verified-complete.cjs"
 fetch_file "hooks/on-failure.cjs"           "hooks/on-failure.cjs"
 fetch_file "hooks/lib/l3-rules.cjs"         "hooks/lib/l3-rules.cjs"
 fetch_file "hooks/lib/final-gate.cjs"       "hooks/lib/final-gate.cjs"
 ok "Common hook files installed"
+
+# ─── Step 3b: Install Git Pre-Commit Gate ─────────────────────────────────────
+
+info "Installing Git Pre-Commit Gate..."
+mkdir -p hooks/git
+fetch_file "hooks/git/pre-commit" "hooks/git/pre-commit"
+chmod +x hooks/git/pre-commit
+git config core.hooksPath hooks/git
+
+if [[ -f "package.json" ]]; then
+  HAS_PREPARE=$(node -e "
+    try {
+      const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+      console.log(!!(pkg.scripts && pkg.scripts.prepare));
+    } catch {
+      console.log('false');
+    }
+  ")
+  if [[ "$HAS_PREPARE" == "false" ]]; then
+    if npm pkg set scripts.prepare="git config core.hooksPath hooks/git" >/dev/null 2>&1; then
+      ok "scripts.prepare set to Git hooks path"
+    else
+      warn "Failed to set scripts.prepare automatically. Please add '\"prepare\": \"git config core.hooksPath hooks/git\"' to your package.json scripts."
+    fi
+  else
+    warn "Existing prepare script detected in package.json. Please ensure 'git config core.hooksPath hooks/git' is run during prepare/postinstall."
+  fi
+else
+  info "No package.json found. Run 'git config core.hooksPath hooks/git' manually in new clones."
+fi
+ok "Git pre-commit gate installed"
 
 info "Installing agent personas..."
 mkdir -p agents
@@ -200,8 +242,6 @@ cat > hooks/config.json << CONFIGEOF
   "srcDir": "${SRC_DIR}",
   "archTriggerPaths": ${ARCH_JSON},
   "qaTriggerMinLines": 30,
-  "debateLedger": "memory/debate/rounds.json",
-  "verifiedCompletePath": "state/verified-complete.json",
   "qualityGate": {
     "minDiffLines": ${MIN_DIFF},
     "rejectWhitespaceOnly": true,
@@ -216,16 +256,19 @@ ok "hooks/config.json written"
 install_claude=false
 install_opencode=false
 install_omx=false
+install_codex=false
 case "$ADAPTERS" in
   omc)      install_claude=true ;;
   omo)      install_opencode=true ;;
   omx)      install_omx=true ;;
-  all)      install_claude=true; install_opencode=true; install_omx=true ;;
+  codex)    install_codex=true ;;
+  all)      install_claude=true; install_opencode=true; install_omx=true; install_codex=true ;;
   *)
     warn "Unknown adapter choice '${ADAPTERS}' — defaulting to all"
     install_claude=true
     install_opencode=true
     install_omx=true
+    install_codex=true
     ;;
 esac
 
@@ -265,6 +308,17 @@ if [[ "$install_omx" == true ]]; then
   mkdir -p .omx
   fetch_file ".omx/settings.json" ".omx/settings.json"
   ok "OMX adapter ready"
+fi
+
+if [[ "$install_codex" == true ]]; then
+  info "Installing Codex adapter..."
+  mkdir -p .codex/commands
+  fetch_file ".codex/README.md" ".codex/README.md"
+  fetch_file ".codex/commands/preflight.sh" ".codex/commands/preflight.sh"
+  fetch_file ".codex/commands/post-task.sh" ".codex/commands/post-task.sh"
+  fetch_file ".codex/commands/final-check.sh" ".codex/commands/final-check.sh"
+  chmod +x .codex/commands/preflight.sh .codex/commands/post-task.sh .codex/commands/final-check.sh
+  ok "Codex adapter ready"
 fi
 
 # ─── Step 7: Generate AGENTS.md ───────────────────────────────────────────────
@@ -323,10 +377,8 @@ fi
 
 GITIGNORE_ENTRIES=(
   "# Harness runtime state (agent-generated, local only)"
-  "memory/debate/"
-  "memory/notepad.md"
   "memory/project-memory.json"
-  "state/"
+  ".omc/state/"
 )
 
 if [[ ! -f ".gitignore" ]]; then
@@ -375,18 +427,25 @@ fi
 if [[ "$install_omx" == true ]]; then
   STAGE_TARGETS="${STAGE_TARGETS} .omx/"
 fi
+if [[ "$install_codex" == true ]]; then
+  STAGE_TARGETS="${STAGE_TARGETS} .codex/"
+fi
 echo "  Next steps:"
-echo "    1. Review $(bold 'AGENTS.md') — add your stack-specific notes"
-echo "    2. Stage:  $(bold "git add ${STAGE_TARGETS}")"
+echo "    - Review $(bold 'AGENTS.md') — add your stack-specific notes"
+echo "    - Stage:  $(bold "git add ${STAGE_TARGETS}")"
 if [[ "$install_claude" == true ]]; then
-  echo "    3. Claude: open Claude Code — hooks are live via .claude/settings.json"
+  echo "    - Claude: open Claude Code — hooks are live via .claude/settings.json"
 fi
 if [[ "$install_opencode" == true ]]; then
-  echo "    4. OpenCode: hooks are live via .opencode/settings.json"
+  echo "    - OpenCode: hooks are live via .opencode/settings.json"
 fi
 if [[ "$install_omx" == true ]]; then
-  echo "    5. OMX: hooks are live via .omx/settings.json"
+  echo "    - OMX: hooks are live via .omx/settings.json"
 fi
+if [[ "$install_codex" == true ]]; then
+  echo "    - Codex: commands are live via .codex/commands/"
+fi
+echo "    - 커밋 게이트 활성화됨 — 다른 클론은 install 시 자동"
 echo ""
 DOCS_LINE="README.md, ARCHITECTURE.md"
 echo "  Docs: ${DOCS_LINE}"

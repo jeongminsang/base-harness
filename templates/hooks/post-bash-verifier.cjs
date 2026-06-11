@@ -17,11 +17,14 @@ process.stdin.on("end", () => {
     return;
   }
 
-  const output = data.tool_response || data.output || "";
+  const resp = data.tool_response ?? data.output ?? "";
+  const output = typeof resp === "string"
+    ? resp
+    : [resp.stdout, resp.stderr, resp.output].filter((v) => typeof v === "string").join("\n");
 
   // 빌드/타입체크/린트 실패 패턴
   const isFailed =
-    /error:|failed|cannot|permission denied|fatal:|tsc:|✖|TS\d{4}|exit code: [1-9]/i.test(
+    /(^|\s)error(\s+TS\d+)?:|TS\d{4}\b|npm ERR!|fatal:|ELIFECYCLE|Command failed|✖|exit code:? [1-9]/im.test(
       output
     );
 
