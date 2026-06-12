@@ -42,7 +42,19 @@ process.stdin.on("end", () => {
 });
 
 function isSrcFile(p) {
-  return p.includes("src/") && /\.(tsx?|jsx?)$/.test(p);
+  // srcDir은 preset마다 다르므로(config.json) 하드코딩하지 않는다.
+  let srcDir = "src/";
+  try {
+    srcDir = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8")).srcDir || "src/";
+  } catch {}
+  if (!/\.(tsx?|jsx?)$/.test(p)) return false;
+  // ROOT와 p의 symlink 표기가 어긋날 수 있어(macOS /tmp 등) 양쪽 다 realpath로 정규화.
+  let realRoot = ROOT;
+  try { realRoot = fs.realpathSync(ROOT); } catch {}
+  let abs = path.resolve(realRoot, p);
+  try { abs = path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs)); } catch {}
+  const rel = path.relative(realRoot, abs);
+  return !rel.startsWith("..") && rel.startsWith(srcDir);
 }
 
 function deny(violations, warnings) {

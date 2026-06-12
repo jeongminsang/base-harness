@@ -10,8 +10,24 @@ const ROOT = path.resolve(__dirname, "..");
 const SKILLS = path.join(ROOT, "skills");
 const K = 3;
 
+let CFG = {};
+try { CFG = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8")); } catch {}
+const SRC_DIR = CFG.srcDir || "src/";
+
+// 프로젝트 소스 파일 판정 — srcDir은 preset마다 다르므로(config.json) 하드코딩하지 않는다.
+// ROOT와 file_path의 symlink 표기가 어긋날 수 있어(macOS /tmp 등) 양쪽 다 realpath로 정규화.
+const REAL_ROOT = (() => { try { return fs.realpathSync(ROOT); } catch { return ROOT; } })();
+function isProjectSource(filePath) {
+  if (!/\.(tsx?|jsx?)$/.test(filePath)) return false;
+  let abs = path.resolve(REAL_ROOT, filePath);
+  try { abs = path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs)); } catch {}
+  const rel = path.relative(REAL_ROOT, abs);
+  return !rel.startsWith("..") && rel.startsWith(SRC_DIR);
+}
+
 // Adapter hook path: stdin JSON → tool_input 텍스트 추출
-// CLI/manual path: process.argv 그대로 사용
+// CLI/manual path (Codex preflight.sh 등): process.argv 그대로 사용
+const isCliMode = process.argv.length > 2;
 let task = process.argv.slice(2).join(" ").toLowerCase();
 let sessionId = null;
 if (!task && !process.stdin.isTTY) {
@@ -22,7 +38,7 @@ if (!task && !process.stdin.isTTY) {
     const ti = payload.tool_input || {};
     // 프로젝트 소스 파일 대상일 때만 주입 — 레포 밖/비소스 파일 쓰기에
     // 컨벤션 스킬을 주입하는 것은 컨텍스트 노이즈다 (enforcer와 동일 기준)
-    if (ti.file_path && !/src\/.*\.(tsx?|jsx?)$/.test(ti.file_path)) {
+    if (ti.file_path && !isProjectSource(ti.file_path)) {
       process.exit(0);
     }
     task = [
@@ -107,20 +123,25 @@ if (sessionId) {
   } catch {}
 }
 
-// PreToolUse 훅의 plain stdout은 모델 컨텍스트에 주입되지 않는다(transcript 전용).
-// 컨텍스트 주입은 hookSpecificOutput.additionalContext JSON으로만 동작한다.
 const MAX_SKILL_CHARS = 4000;
 const parts = ['<harness-ctx source="pre-task.cjs">'];
 for (const { file, score, txt } of toInject) {
   parts.push(`\n<!-- skill: ${path.relative(ROOT, file)} score=${score} -->`);
   parts.push(txt.length > MAX_SKILL_CHARS ? txt.slice(0, MAX_SKILL_CHARS) + "\n…(truncated)" : txt);
 }
-
 parts.push("</harness-ctx>");
-console.log(JSON.stringify({
-  continue: true,
-  hookSpecificOutput: {
-    hookEventName: "PreToolUse",
-    additionalContext: parts.join("\n"),
-  },
-}));
+
+if (isCliMode) {
+  // CLI 경로(Codex preflight.sh)는 stdout이 그대로 컨텍스트로 읽히므로 plain text.
+  console.log(parts.join("\n"));
+} else {
+  // PreToolUse 훅의 plain stdout은 모델 컨텍스트에 주입되지 않는다(transcript 전용).
+  // 컨텍스트 주입은 hookSpecificOutput.additionalContext JSON으로만 동작한다.
+  console.log(JSON.stringify({
+    continue: true,
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      additionalContext: parts.join("\n"),
+    },
+  }));
+}
