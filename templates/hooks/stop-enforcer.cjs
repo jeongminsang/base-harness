@@ -5,11 +5,55 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 const { evaluateFinalGate, loadConfig } = require("./lib/final-gate.cjs");
+const { ROOT } = require("./lib/l3-rules.cjs");
 
-const ROOT = (() => {
-  const candidate = path.resolve(__dirname, "..");
-  return path.basename(candidate) === "templates" ? path.dirname(candidate) : candidate;
-})();
+// Non-blocking review reminder: significant uncommitted changes in major paths
+// should get a fresh-context review (/code-review) before being committed.
+function reviewReminder() {
+  const cfg = loadConfig();
+  const archPaths = cfg.archTriggerPaths || ["src/pages/", "src/components/"];
+  const minLines = cfg.qaTriggerMinLines || 30;
+  try {
+    const stat = execSync(`git diff HEAD --numstat -- ${archPaths.join(" ")}`, {
+      cwd: ROOT,
+      encoding: "utf8",
+      timeout: 5000,
+    });
+    let changed = 0;
+    for (const line of stat.split("\n")) {
+      const m = line.match(/^(\d+)\t(\d+)\t/);
+      if (m) changed += Number(m[1]) + Number(m[2]);
+    }
+    if (changed >= minLines) {
+      return `[Harness] 주요 경로(${archPaths.join(", ")})에 미커밋 변경 ${changed}줄 — 커밋 전 /code-review 실행을 권고합니다.`;
+    }
+  } catch {}
+  return null;
+}
+
+// Bounded blocking: a Stop hook that blocks unconditionally loops forever when
+// the gate is unsatisfiable. stop_hook_active marks stops caused by this hook;
+// after MAX_BLOCKS consecutive blocks we let the stop through with a warning.
+const ATTEMPTS_PATH = path.join(ROOT, ".omc/state/stop-gate-attempts.json");
+const MAX_BLOCKS = 3;
+
+function readAttempts() {
+  try {
+    return JSON.parse(fs.readFileSync(ATTEMPTS_PATH, "utf8")).count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeAttempts(count) {
+  try {
+    fs.mkdirSync(path.dirname(ATTEMPTS_PATH), { recursive: true });
+    fs.writeFileSync(
+      ATTEMPTS_PATH,
+      JSON.stringify({ count, updatedAt: new Date().toISOString() })
+    );
+  } catch {}
+}
 
 let raw = "";
 process.stdin.on("data", (c) => (raw += c));
@@ -22,119 +66,39 @@ process.stdin.on("end", () => {
     return;
   }
 
+  // Involuntary or user-initiated stops must never be gated: blocking a
+  // context-limit stop just burns the remaining window, and blocking a user
+  // cancel overrides an explicit human decision.
   const stopReason = (data.stop_reason || "").toLowerCase();
   if (stopReason.includes("context_limit") || stopReason.includes("max_tokens")) {
     console.log(JSON.stringify({ continue: true, suppressOutput: true }));
     return;
   }
-
   if (data.user_requested || stopReason.includes("user_cancel")) {
     console.log(JSON.stringify({ continue: true, suppressOutput: true }));
     return;
   }
 
-  const CFG = loadConfig();
-  const attemptsPath = path.join(ROOT, ".omc", "state", "stop-gate-attempts.json");
-
-  let attempts = { count: 0, updatedAt: new Date().toISOString() };
-  if (fs.existsSync(attemptsPath)) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(attemptsPath, "utf8"));
-      if (parsed && typeof parsed.count === "number") {
-        attempts.count = parsed.count;
-      }
-      if (parsed && parsed.updatedAt) {
-        attempts.updatedAt = parsed.updatedAt;
-        const elapsed = Date.now() - new Date(attempts.updatedAt).getTime();
-        if (elapsed > 3600000) {
-          attempts.count = 0;
-          attempts.updatedAt = new Date().toISOString();
-        }
-      }
-    } catch {}
-  }
-
   const result = evaluateFinalGate();
-  if (!result.ok) {
-    attempts.count = (attempts.count || 0) + 1;
-    attempts.updatedAt = new Date().toISOString();
-    try {
-      fs.mkdirSync(path.dirname(attemptsPath), { recursive: true });
-      fs.writeFileSync(attemptsPath, JSON.stringify(attempts, null, 2));
-    } catch {}
-
-    if (attempts.count > 3) {
-      attempts.count = 0;
-      attempts.updatedAt = new Date().toISOString();
-      try {
-        fs.writeFileSync(attemptsPath, JSON.stringify(attempts, null, 2));
-      } catch {}
-
-      const reasonLines = result.reason.split("\n");
-      const reasonSnippet = reasonLines.length > 3 ? reasonLines.slice(0, 3).join("\n") + "\n..." : result.reason;
-      console.log(JSON.stringify({
-        continue: true,
-        systemMessage: `[Harness] 게이트 3회 연속 실패 — 차단 해제. 미해결:\n${reasonSnippet}`
-      }));
-      return;
-    }
-
-    console.log(JSON.stringify({ decision: "block", reason: result.reason }));
+  if (result.ok) {
+    writeAttempts(0);
+    const reminder = reviewReminder();
+    const out = { continue: true, suppressOutput: true };
+    if (reminder) out.systemMessage = reminder;
+    console.log(JSON.stringify(out));
     return;
   }
 
-  // Gate passed: reset attempts count
-  attempts.count = 0;
-  attempts.updatedAt = new Date().toISOString();
-  try {
-    fs.mkdirSync(path.dirname(attemptsPath), { recursive: true });
-    fs.writeFileSync(attemptsPath, JSON.stringify(attempts, null, 2));
-  } catch {}
-
-  // Check reminder
-  const archPaths = CFG.archTriggerPaths || ["src/pages/", "src/components/"];
-  const minLines = CFG.qaTriggerMinLines !== undefined ? CFG.qaTriggerMinLines : 30;
-
-  let totalLinesChanged = 0;
-  try {
-    // Check if git HEAD exists first (to avoid fatal error in fresh git repos without commits)
-    const hasHead = execSync("git rev-parse --verify HEAD >/dev/null 2>&1 && echo yes || echo no", { cwd: ROOT, encoding: "utf8" }).trim() === "yes";
-    if (hasHead && archPaths.length > 0) {
-      const escapedPaths = archPaths.map(p => `"${p}"`).join(" ");
-      // 1. Modified/deleted lines via diff numstat
-      const stdout = execSync(`git diff HEAD --numstat -- ${escapedPaths}`, { cwd: ROOT, encoding: "utf8" });
-      const lines = stdout.trim().split("\n");
-      for (const line of lines) {
-        if (line) {
-          const parts = line.trim().split(/\s+/);
-          const added = parseInt(parts[0], 10);
-          const deleted = parseInt(parts[1], 10);
-          if (!isNaN(added)) totalLinesChanged += added;
-          if (!isNaN(deleted)) totalLinesChanged += deleted;
-        }
-      }
-      // 2. Untracked lines in guarded paths
-      const untrackedStdout = execSync(`git ls-files --others --exclude-standard -- ${escapedPaths}`, { cwd: ROOT, encoding: "utf8" });
-      const untrackedFiles = untrackedStdout.trim().split("\n").filter(Boolean);
-      for (const relFile of untrackedFiles) {
-        const absFile = path.resolve(ROOT, relFile);
-        try {
-          const content = fs.readFileSync(absFile, "utf8");
-          totalLinesChanged += content.split("\n").length;
-        } catch {}
-      }
-    }
-  } catch (e) {
-    // Ignore git command errors
+  const attempts = data.stop_hook_active ? readAttempts() : 0;
+  if (attempts >= MAX_BLOCKS) {
+    writeAttempts(0);
+    process.stderr.write(
+      `[Harness] Gate still failing after ${MAX_BLOCKS} blocks; allowing stop to avoid an infinite loop.\nLast reason:\n${result.reason}\n`
+    );
+    console.log(JSON.stringify({ continue: true }));
+    return;
   }
 
-  if (totalLinesChanged >= minLines) {
-    console.log(JSON.stringify({
-      continue: true,
-      suppressOutput: true,
-      systemMessage: `[Harness] 주요 경로 미커밋 변경 ${totalLinesChanged}줄 — 커밋 전 /code-review 권고`
-    }));
-  } else {
-    console.log(JSON.stringify({ continue: true, suppressOutput: true }));
-  }
+  writeAttempts(attempts + 1);
+  console.log(JSON.stringify({ decision: "block", reason: result.reason }));
 });

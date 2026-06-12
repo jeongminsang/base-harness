@@ -47,7 +47,7 @@
   - Mandatory YAML FM: `{name, description, id, level, triggers: [], source, version}`
   - `level`: `1` Guidance · `2` Pattern · `3` Hard-Rule
   - Structure: **Triggers → Context → Best Practices → Anti-Patterns**
-- **Action Hooks**: `hooks/` (zero-dep Node `.cjs` scripts)
+- **Action Hooks**: `hooks/` (zero-dep Node `.cjs` scripts). Git gate: `hooks/git/pre-commit` (activated via `prepare` script → `core.hooksPath`).
 - **Persistence**:
   - `skills/` (pre-task 컨텍스트 주입)
   - `memory/project-memory.json` (채굴 메타)
@@ -61,8 +61,8 @@ Each harness persona declares its required capability tier in `agents/<persona>.
 
 | Tier | Capability  | Harness Personas                        |
 |------|-------------|----------------------------------------|
-| 3    | Maximum     | architect, critic, reviewer            |
-| 2    | Balanced    | analyst, executor                      |
+| 3    | Maximum     | critic, reviewer                       |
+| 2    | Balanced    | architect, analyst, executor           |
 | 1    | Lightweight | learner                                |
 
 ### Platform Model Mapping
@@ -81,7 +81,7 @@ When invoking a harness persona as a sub-agent, use the corresponding platform a
 
 | Persona   | Tier | OMO Agent   | OMC Agent        | Role |
 |-----------|------|-------------|------------------|------|
-| architect | 3    | prometheus  | architect        | 설계안 직접 반환, 대규모 설계는 fresh-context 리뷰 권고 |
+| architect | 2    | prometheus  | architect        | 설계안 직접 반환, 대규모 설계는 fresh-context 리뷰 권고 |
 | critic    | 3    | oracle      | critic           | 명시적 리뷰 요청 시 fresh-context로 리뷰 보고 직접 반환 |
 | analyst   | 2    | prometheus  | analyst          | 제안과 리뷰가 충돌할 때 명시적 호출, 보고 반환 |
 | executor  | 2    | hephaestus  | executor         | 구현 담당. 채굴은 git pre-commit이 자동 실행 |
@@ -146,4 +146,15 @@ Codex does not receive automatic hook events. Run these commands manually at the
 
 **Rules:**
 - `final-check.sh` **must pass** before a task is considered done. A non-zero exit is a hard block.
+- Skill mining (`post-task.sh`) runs automatically via the git pre-commit hook; manual invocation is optional.
+
+## 10. Persistent Memory Tags
+
+- `<remember>` / `<remember priority>`: store as the platform's auto-memory (e.g. Claude Code `~/.claude/projects/.../memory/`) — the only store loaded automatically each session.
 <!-- HARNESS:MANAGED:END -->
+
+## 11. Project-Specific Conventions (DP)
+
+<!-- Add your project's domain conventions here (this section is preserved on harness updates).
+     Recommended pattern: keep full rules in CLAUDE.md (single source of truth, auto-loaded)
+     and reference them here for other agents. -->

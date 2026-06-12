@@ -10,7 +10,6 @@ if (result.ok) {
     console.log(`[Harness] Final check skipped: ${result.reason}`);
   } else {
     console.log("[Harness] Final check passed.");
-    if (result.verifiedPath) console.log(`[Harness] Verification artifact: ${result.verifiedPath}`);
   }
   process.exit(0);
 }
