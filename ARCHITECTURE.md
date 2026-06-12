@@ -38,6 +38,7 @@ Claude, OpenCode (OMO), and OMX share the same hook event API. Each uses automat
 - OMX: `.omx/settings.json`
 
 - `PreToolUse` → `hooks/pre-tool-enforcer.cjs`, `hooks/pre-task.cjs`
+  - `pre-task.cjs` injects matching skills via `hookSpecificOutput.additionalContext` (plain stdout is not injected into model context). Injection is deduplicated per session (`.omc/state/injected-skills.json`, last 5 sessions kept) — a skill already in the conversation context is not re-injected, saving tokens.
 - `PostToolUse` for bash → `hooks/post-bash-verifier.cjs`
 - `Stop` → `hooks/stop-enforcer.cjs`
 - Git Hook: `hooks/git/pre-commit` triggers the final gate checks and skill mining.
@@ -106,7 +107,7 @@ commit → pre-commit mining (.draft.md)        [자동, 커밋당 1회]
     "src/pages/",
     "src/components/"
   ],
-  "qaTriggerMinLines": 30,
+  "qaTriggerMinLines": 50,
   "qualityGate": {
     "minDiffLines": 10,
     "rejectWhitespaceOnly": true,
