@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# pre-commit gate: deterministic checks only (L3 scan → tsc → eslint).
+# pre-commit gate: deterministic checks only (L3 scan → tsc -b → eslint).
 # Skill draft mining runs after the gate and never blocks the commit.
 set -uo pipefail
+
 cd "$(git rev-parse --show-toplevel)"
 
 node hooks/run-final-check.cjs
@@ -12,4 +13,5 @@ if [ "$gate_exit" -ne 0 ]; then
 fi
 
 node hooks/post-task.cjs || true
+
 exit 0

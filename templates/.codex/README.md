@@ -13,5 +13,7 @@ Codex does not use Claude's automatic hook API, so this adapter provides explici
 ## Workflow
 
 1. Run `preflight.sh` before major implementation work to load matching skills.
-2. Run your build, lint, and task-specific verification. (Note: `post-task.sh` is automatically run during git pre-commit, so manual invocation is optional).
-3. Run `final-check.sh` before finishing.
+2. Run your build, lint, and task-specific verification.
+3. Run `final-check.sh` before finishing — it runs the deterministic gate (L3 scan → `tsc -b --noEmit` → eslint on changed files) and must exit 0.
+
+Skill draft mining (`post-task.sh`) also runs automatically via the git pre-commit hook (`hooks/git/pre-commit`), so manual invocation is optional.

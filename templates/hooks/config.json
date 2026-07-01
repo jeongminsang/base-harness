@@ -9,7 +9,7 @@
     "src/pages/",
     "src/components/"
   ],
-  "qaTriggerMinLines": 30,
+  "qaTriggerMinLines": 50,
   "qualityGate": {
     "minDiffLines": 10,
     "rejectWhitespaceOnly": true,

@@ -1,7 +1,7 @@
 "use strict";
 
 // vanilla-ts preset — no stack-specific rules
-// Core rules (no-any-type, ARCH-TRIGGER) are handled by hooks/lib/l3-rules.cjs
+// Core rules (no-any-type) are handled by hooks/lib/l3-rules.cjs
 
 function checkL3(_filePath, _content, _opts) {
   return [];

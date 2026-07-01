@@ -241,7 +241,7 @@ cat > hooks/config.json << CONFIGEOF
   "lintCmd": "${LINT_CMD}",
   "srcDir": "${SRC_DIR}",
   "archTriggerPaths": ${ARCH_JSON},
-  "qaTriggerMinLines": 30,
+  "qaTriggerMinLines": 50,
   "qualityGate": {
     "minDiffLines": ${MIN_DIFF},
     "rejectWhitespaceOnly": true,
@@ -343,7 +343,9 @@ if [[ ! -f "AGENTS.md" ]]; then
   ok "AGENTS.md generated"
 elif grep -q "<!-- HARNESS:MANAGED:START -->" AGENTS.md 2>/dev/null; then
   info "Updating AGENTS.md harness-managed sections..."
-  _AGENTS_NEW=$(_render_agents_tpl)
+  # Only the managed block — content after END in the template (e.g. the §11
+  # skeleton) must not be re-appended over the user's preserved section.
+  _AGENTS_NEW=$(_render_agents_tpl | awk '/<!-- HARNESS:MANAGED:START -->/{found=1} found{print} /<!-- HARNESS:MANAGED:END -->/{if (found) exit}')
   _AGENTS_BEFORE=$(awk '/<!-- HARNESS:MANAGED:START -->/{exit} {print}' AGENTS.md)
   _AGENTS_AFTER=$(awk '/<!-- HARNESS:MANAGED:END -->/{found=1; next} found{print}' AGENTS.md)
   {
@@ -432,6 +434,7 @@ if [[ "$install_codex" == true ]]; then
 fi
 echo "  Next steps:"
 echo "    - Review $(bold 'AGENTS.md') — add your stack-specific notes"
+echo "      (프로젝트 고유 섹션은 CLAUDE.md에 단일 소스로 두고 AGENTS.md에서 참조하는 패턴 권장)"
 echo "    - Stage:  $(bold "git add ${STAGE_TARGETS}")"
 if [[ "$install_claude" == true ]]; then
   echo "    - Claude: open Claude Code — hooks are live via .claude/settings.json"

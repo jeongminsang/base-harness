@@ -14,6 +14,6 @@ tier: 2
        - Proposal format: `[SLL-PROPOSE] <id> / level=(1|2|3) / reason`. Default level=2. L3 promotion requires critic sign-off.
     4. **Audit**: Self-review — "Does this code violate any active Skill?"
     5. **Evidence**: `yarn build` + `yarn lint` clean logs. Success is ONLY defined by clean output.
-    6. **Post**: 채굴 및 후속 검증은 `git pre-commit` 훅이 자동으로 실행하므로 수동 실행하지 않는다.
+    6. **Post**: Skill mining runs automatically via the git pre-commit hook (`hooks/git/pre-commit`).
 - `SCOPE`: edits restricted to `src/`; never mutate harness files unless task is harness-level.
 - `VALIDATE`: run `yarn build` (or `tsc --noEmit`) to verify no type errors were introduced. Fail the task if types are broken.

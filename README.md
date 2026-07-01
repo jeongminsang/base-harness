@@ -56,7 +56,11 @@ Note: Optional adapter configurations like `.claude/`, `.opencode/`, `.omx/`, or
 
 ## Commit Gate
 
-Deterministic checks (L3 scan → tsc → eslint) are enforced automatically via Stop hook and git pre-commit. No verification state files are written or reviewed by models.
+Deterministic checks (L3 scan → tsc → eslint) are enforced automatically via Stop hook and git pre-commit. No verification state files are written or reviewed by models — a gate the model can write is a gate the model will rubber-stamp; only checks the model cannot forge (regex scan, tsc, eslint, fresh-context review) act as gates.
+
+## Skill Injection
+
+`pre-task.cjs` injects matching skills as `additionalContext` on Write/Edit. Each skill is injected at most once per session (deduplicated via `.omc/state/injected-skills.json`), keeping token usage flat across long sessions.
 
 ## Update
 
