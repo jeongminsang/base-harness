@@ -21,18 +21,32 @@ function checkL3(filePath, content, _opts) {
   const violations = [];
   const clean = stripComments(content);
 
-  // [L3] No direct fetch in client components — use server actions or route handlers
+  // [L3] No direct fetch in client components — use server actions or route handlers,
+  // except calls to the app's own Route Handlers under /api/*.
   const isClientComponent = /['"]use client['"]/.test(content);
   const isRouteHandler = /route\.(ts|js)$/.test(filePath);
   const isServerAction = /['"]use server['"]/.test(content);
 
-  if (isClientComponent && !isRouteHandler && /(?<!\w)fetch\s*\(/.test(clean)) {
-    violations.push({
-      skill: "next-fetch (L3)",
-      detail:
-        "Direct fetch() in a client component. " +
-        "Use a Server Action ('use server') or Route Handler (app/api/) instead.",
-    });
+  if (isClientComponent && !isRouteHandler) {
+    const FETCH_CALL = /(?<!\w)fetch\s*\(\s*(?:(['"`])((?:\\.|(?!\1)[^\\])*)\1)?/g;
+    let match;
+    let hasDisallowedFetch = false;
+    while ((match = FETCH_CALL.exec(clean))) {
+      const literal = match[2];
+      if (literal === undefined || !(literal.startsWith("/api/") || literal === "/api")) {
+        hasDisallowedFetch = true;
+        break;
+      }
+    }
+    if (hasDisallowedFetch) {
+      violations.push({
+        skill: "next-fetch (L3)",
+        detail:
+          "Direct fetch() to a non-local URL in a client component. " +
+          "Use a Server Action ('use server') or Route Handler (app/api/) instead. " +
+          "Calls to fetch('/api/...') are allowed.",
+      });
+    }
   }
 
   // [L3] No direct env access in client components
