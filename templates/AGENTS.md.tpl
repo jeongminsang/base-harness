@@ -124,8 +124,9 @@ Event → [SLL-PROPOSE] → User Approve → skills/<cat>/<id>/SKILL.md
 ```text
 commit → pre-commit mining (.draft.md)        [자동, 커밋당 1회]
        → 사람 승격: .draft.md → SKILL.md       [수동 게이트]
-       → L1/L2: pre-task 컨텍스트 주입
-       → L3 승격 기준: ① 위반 반복 관찰 + ② 정규식 검출 가능 → preset l3-rules에 추가
+       → L1/L2: pre-task 컨텍스트 주입 (.draft.md는 승격 전까지 주입되지 않음)
+       → L3 승격 기준: ① 위반 반복 관찰 + ② 정규식 검출 가능 → hooks/lib/l3-local.cjs에 추가
+         (프로젝트 소유 — bootstrap 업데이트가 덮어쓰지 않음)
        → 정규식 불가 패턴: SKILL.md + /code-review 담당
 ```
 

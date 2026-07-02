@@ -60,7 +60,9 @@ function walk(dir, out = []) {
     const p = path.join(dir, f);
     const s = fs.statSync(p);
     if (s.isDirectory()) walk(p, out);
-    else if (f === "SKILL.md" || f.endsWith(".draft.md")) out.push(p);
+    // DRAFT-FIRST: .draft.md는 사람 승격(.md로 rename) 전까지 절대 주입하지
+    // 않는다 — 자동 채굴 draft는 광범위한 트리거로 raw diff를 계속 흘려보낸다.
+    else if (f === "SKILL.md" || (f.endsWith(".md") && !f.endsWith(".draft.md"))) out.push(p);
   }
   return out;
 }

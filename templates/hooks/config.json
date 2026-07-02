@@ -2,7 +2,7 @@
   "version": "0.1",
   "preset": "vite",
   "adapters": "all",
-  "buildCheckCmd": "./node_modules/.bin/tsc -b --noEmit",
+  "buildCheckCmd": "./node_modules/.bin/tsc -b",
   "lintCmd": "npx eslint",
   "srcDir": "src/",
   "archTriggerPaths": [

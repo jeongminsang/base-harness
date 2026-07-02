@@ -41,7 +41,8 @@ ${trace || "(fill in)"}
 (fill in; reference commit SHA)
 
 ## Prevent next time
-(pre-task.js will inject this on trigger match)
+(drafts are never injected — promote by renaming .draft.md → .md,
+then pre-task.cjs injects it on trigger match)
 `);
 
 console.log(`[on-failure] wrote ${path.relative(ROOT, file)}`);

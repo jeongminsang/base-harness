@@ -60,7 +60,7 @@ Deterministic checks (L3 scan → tsc → eslint) are enforced automatically via
 
 ## Skill Injection
 
-`pre-task.cjs` injects matching skills as `additionalContext` on Write/Edit. Each skill is injected at most once per session (deduplicated via `.omc/state/injected-skills.json`), keeping token usage flat across long sessions.
+`pre-task.cjs` injects matching skills as `additionalContext` on Write/Edit. Each skill is injected at most once per session (deduplicated via `.omc/state/injected-skills.json`), keeping token usage flat across long sessions. Auto-mined `.draft.md` files are never injected — a human promotes a draft by renaming it to `.md` (DRAFT-FIRST).
 
 ## Update
 
@@ -69,6 +69,7 @@ Re-run `bootstrap.sh`. It is safe for update mode:
 - Existing `.claude/settings.json`, `.opencode/settings.json`, `.omx/settings.json` files keep non-hook settings and get only the hook section refreshed.
 - Existing `AGENTS.md` files prompt before regeneration.
 - Re-running Codex install refreshes `.codex/commands/*` deterministically.
+- `hooks/lib/l3-local.cjs` (project-owned L3/L2 rules — the promotion ladder target) is never overwritten. `hooks/lib/l3-preset.cjs` is refreshed; if it was locally modified, a `.bak` backup is saved first.
 
 ## Docs
 

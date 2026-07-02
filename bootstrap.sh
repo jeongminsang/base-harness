@@ -151,7 +151,9 @@ echo ""
 
 PRESET=$(prompt_choice "Stack preset" "vite | next-ts | vanilla-ts" "vite")
 ADAPTERS=$(prompt_choice "Adapter install" "omc | omo | omx | codex | all" "all")
-BUILD_CMD=$(prompt "Build check command" "./node_modules/.bin/tsc -b --noEmit")
+# NOTE: 'tsc -b --noEmit' errors (TS5094) on TypeScript <= 5.5 — default to
+# plain '-b'; emit behavior belongs in tsconfig's "noEmit".
+BUILD_CMD=$(prompt "Build check command" "./node_modules/.bin/tsc -b")
 LINT_CMD=$(prompt "Lint command" "npx eslint")
 SRC_DIR=$(prompt "Source directory" "src/")
 ARCH_PATHS_RAW=$(prompt "ARCH-TRIGGER paths (comma-separated)" "src/pages/,src/components/")
@@ -183,6 +185,10 @@ fetch_file "hooks/run-final-check.cjs"      "hooks/run-final-check.cjs"
 fetch_file "hooks/on-failure.cjs"           "hooks/on-failure.cjs"
 fetch_file "hooks/lib/l3-rules.cjs"         "hooks/lib/l3-rules.cjs"
 fetch_file "hooks/lib/final-gate.cjs"       "hooks/lib/final-gate.cjs"
+# l3-local.cjs is project-owned (promotion ladder target) — install once, never overwrite.
+if [[ ! -f "hooks/lib/l3-local.cjs" ]]; then
+  fetch_file "hooks/lib/l3-local.cjs" "hooks/lib/l3-local.cjs"
+fi
 ok "Common hook files installed"
 
 # ─── Step 3b: Install Git Pre-Commit Gate ─────────────────────────────────────
@@ -226,7 +232,20 @@ ok "Agents installed"
 # ─── Step 4: Apply preset ─────────────────────────────────────────────────────
 
 info "Applying preset: ${PRESET}..."
-fetch_preset_file "$PRESET" "hooks/lib/l3-preset.cjs"
+if [[ -f "hooks/lib/l3-preset.cjs" ]]; then
+  # Never silently destroy locally-added rules: back up before refreshing and
+  # point the user at l3-local.cjs, the file updates never touch.
+  _TMP_PRESET="$(mktemp)"
+  fetch_preset_file "$PRESET" "$_TMP_PRESET"
+  if ! cmp -s "$_TMP_PRESET" "hooks/lib/l3-preset.cjs"; then
+    cp "hooks/lib/l3-preset.cjs" "hooks/lib/l3-preset.cjs.bak"
+    warn "hooks/lib/l3-preset.cjs differed from the template — backup saved to l3-preset.cjs.bak"
+    warn "Project-owned rules belong in hooks/lib/l3-local.cjs (never overwritten by updates)."
+  fi
+  mv "$_TMP_PRESET" "hooks/lib/l3-preset.cjs"
+else
+  fetch_preset_file "$PRESET" "hooks/lib/l3-preset.cjs"
+fi
 ok "Preset ${PRESET} → hooks/lib/l3-preset.cjs"
 
 # ─── Step 5: Write config.json ────────────────────────────────────────────────

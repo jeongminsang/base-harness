@@ -11,15 +11,51 @@ const ROOT = (() => {
   return path.resolve(__dirname, "../../..");
 })();
 
+// Fallback only — hooks/lib/l3-rules.cjs strips once and passes opts.clean.
+// Must stay string-aware: '//' inside a string literal (e.g. a URL) is not a
+// comment; naive stripping hid the rest of the line from every rule.
 function stripComments(code) {
-  return code
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
+  let out = "";
+  let mode = "code"; // code | line | block | single | double | template
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i];
+    const d = code[i + 1];
+    if (mode === "code") {
+      if (c === "/" && d === "/") { mode = "line"; i++; continue; }
+      if (c === "/" && d === "*") { mode = "block"; i++; continue; }
+      if (c === "'") mode = "single";
+      else if (c === '"') mode = "double";
+      else if (c === "`") mode = "template";
+      out += c;
+      continue;
+    }
+    if (mode === "line") {
+      if (c === "\n") { mode = "code"; out += c; }
+      continue;
+    }
+    if (mode === "block") {
+      if (c === "*" && d === "/") { mode = "code"; i++; }
+      else if (c === "\n") out += c;
+      continue;
+    }
+    if (c === "\\") { out += c + (d == null ? "" : d); i++; continue; }
+    if (
+      (mode === "single" && c === "'") ||
+      (mode === "double" && c === '"') ||
+      (mode === "template" && c === "`")
+    ) {
+      mode = "code";
+    } else if (c === "\n" && mode !== "template") {
+      mode = "code";
+    }
+    out += c;
+  }
+  return out;
 }
 
-function checkL3(filePath, content, _opts) {
+function checkL3(filePath, content, opts = {}) {
   const violations = [];
-  const clean = stripComments(content);
+  const clean = opts.clean != null ? opts.clean : stripComments(content);
 
   // [L3] No direct fetch in client components — use server actions or route handlers,
   // except calls to the app's own Route Handlers under /api/*.
@@ -71,9 +107,9 @@ function checkL3(filePath, content, _opts) {
   return violations;
 }
 
-function checkL2(filePath, content) {
+function checkL2(filePath, content, opts = {}) {
   const warnings = [];
-  const clean = stripComments(content);
+  const clean = opts.clean != null ? opts.clean : stripComments(content);
   if (/HARNESS-BYPASS/.test(content)) return warnings;
 
   // [L2] Prefer Server Components — flag large client component files

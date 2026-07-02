@@ -38,13 +38,19 @@ function getChangedFiles(srcDir) {
   return {
     changedFiles,
     untrackedFiles,
-    allChanged: [...changedFiles, ...untrackedFiles].filter((f) => /\.(tsx?|jsx?)$/.test(f)),
+    // git diff --name-only also lists deleted files; passing one to eslint is
+    // a hard error (exit 2) that made deletion commits impossible to gate.
+    allChanged: [...changedFiles, ...untrackedFiles].filter(
+      (f) => /\.(tsx?|jsx?)$/.test(f) && fs.existsSync(path.join(ROOT, f))
+    ),
   };
 }
 
 function evaluateFinalGate() {
   const cfg = loadConfig();
-  const buildCheckCmd = cfg.buildCheckCmd || "./node_modules/.bin/tsc -b --noEmit";
+  // NOTE: `tsc -b --noEmit` errors with TS5094 on TypeScript <= 5.5 — keep
+  // the default to plain `-b` (emit behavior belongs in tsconfig's noEmit).
+  const buildCheckCmd = cfg.buildCheckCmd || "./node_modules/.bin/tsc -b";
   const lintCmd = cfg.lintCmd || "npx eslint";
   const srcDir = cfg.srcDir || "src/";
 
@@ -90,6 +96,16 @@ function evaluateFinalGate() {
     shell(buildCheckCmd, ROOT, 90000);
   } catch (e) {
     const out = ((e.stdout || "") + (e.stderr || "")).slice(0, 2000);
+    // TS5xxx are command-line/config errors (e.g. TS5094: '--noEmit' with
+    // '--build' on TS <= 5.5), not type errors. Route the fix to config.json
+    // instead of sending the model off to "fix" healthy source code.
+    if (/error TS5\d{3}\b|Unknown compiler option|command not found|ENOENT/i.test(out + (e.code || ""))) {
+      return {
+        ok: false,
+        gate: 2,
+        reason: `[Gate misconfig] buildCheckCmd (${buildCheckCmd}) itself failed to run — fix hooks/config.json, not the source.\n\n${out}`.trim(),
+      };
+    }
     return {
       ok: false,
       gate: 2,

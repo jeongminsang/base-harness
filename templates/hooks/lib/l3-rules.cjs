@@ -22,15 +22,63 @@ const preset = (() => {
   return { checkL3: () => [], checkL2: () => [] };
 })();
 
+// Project-owned rules. bootstrap.sh never overwrites l3-local.cjs, so the L3
+// promotion ladder lands here — l3-preset.cjs is refreshed on every update.
+const localRules = (() => {
+  const p = path.join(__dirname, "l3-local.cjs");
+  if (fs.existsSync(p)) {
+    try { return require(p); } catch {}
+  }
+  return { checkL3: () => [], checkL2: () => [] };
+})();
+
+// String-aware comment stripping. '//' inside a string literal (e.g. a URL)
+// is not a comment — naive line stripping hid everything after it on the same
+// line from every rule. String contents are preserved because rules (e.g. the
+// next-ts fetch allowlist) match on them.
 function stripComments(code) {
-  return code
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
+  let out = "";
+  let mode = "code"; // code | line | block | single | double | template
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i];
+    const d = code[i + 1];
+    if (mode === "code") {
+      if (c === "/" && d === "/") { mode = "line"; i++; continue; }
+      if (c === "/" && d === "*") { mode = "block"; i++; continue; }
+      if (c === "'") mode = "single";
+      else if (c === '"') mode = "double";
+      else if (c === "`") mode = "template";
+      out += c;
+      continue;
+    }
+    if (mode === "line") {
+      if (c === "\n") { mode = "code"; out += c; }
+      continue;
+    }
+    if (mode === "block") {
+      if (c === "*" && d === "/") { mode = "code"; i++; }
+      else if (c === "\n") out += c; // keep line count stable
+      continue;
+    }
+    // inside a string literal
+    if (c === "\\") { out += c + (d == null ? "" : d); i++; continue; }
+    if (
+      (mode === "single" && c === "'") ||
+      (mode === "double" && c === '"') ||
+      (mode === "template" && c === "`")
+    ) {
+      mode = "code";
+    } else if (c === "\n" && mode !== "template") {
+      mode = "code"; // unterminated string — recover
+    }
+    out += c;
+  }
+  return out;
 }
 
-function checkL3Core(filePath, content, { isNewFile = false } = {}) {
+function checkL3Core(filePath, content, opts = {}) {
   const violations = [];
-  const clean = stripComments(content);
+  const clean = opts.clean != null ? opts.clean : stripComments(content);
 
   // [L3] no-any-type — universal
   if (/:\s*any\b|as\s+any\b|<any>|Record<string,\s*any>/.test(clean)) {
@@ -44,14 +92,21 @@ function checkL3Core(filePath, content, { isNewFile = false } = {}) {
 }
 
 function checkL3(filePath, content, opts) {
+  // Strip once, share via opts.clean so preset/local rules don't re-implement it.
+  const shared = { ...(opts || {}), clean: stripComments(content) };
   return [
-    ...checkL3Core(filePath, content, opts),
-    ...preset.checkL3(filePath, content, opts),
+    ...checkL3Core(filePath, content, shared),
+    ...(typeof preset.checkL3 === "function" ? preset.checkL3(filePath, content, shared) : []),
+    ...(typeof localRules.checkL3 === "function" ? localRules.checkL3(filePath, content, shared) : []),
   ];
 }
 
 function checkL2(filePath, content) {
-  return preset.checkL2(filePath, content);
+  const shared = { clean: stripComments(content) };
+  return [
+    ...(typeof preset.checkL2 === "function" ? preset.checkL2(filePath, content, shared) : []),
+    ...(typeof localRules.checkL2 === "function" ? localRules.checkL2(filePath, content, shared) : []),
+  ];
 }
 
 module.exports = { checkL3, checkL2, stripComments, ROOT };

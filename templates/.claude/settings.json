@@ -13,12 +13,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node hooks/pre-tool-enforcer.cjs",
+            "command": "node \"$CLAUDE_PROJECT_DIR/hooks/pre-tool-enforcer.cjs\"",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "node hooks/pre-task.cjs",
+            "command": "node \"$CLAUDE_PROJECT_DIR/hooks/pre-task.cjs\"",
             "timeout": 10
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node hooks/post-bash-verifier.cjs",
+            "command": "node \"$CLAUDE_PROJECT_DIR/hooks/post-bash-verifier.cjs\"",
             "timeout": 5
           }
         ]
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node hooks/stop-enforcer.cjs",
+            "command": "node \"$CLAUDE_PROJECT_DIR/hooks/stop-enforcer.cjs\"",
             "timeout": 120
           }
         ]
