@@ -57,7 +57,10 @@ function checkL3(filePath, content, opts = {}) {
 
   let CFG = {};
   try { CFG = JSON.parse(fs.readFileSync(path.join(ROOT, "hooks/config.json"), "utf8")); } catch {}
-  const srcDir = CFG.srcDir || "src/";
+  // srcDir은 문자열 또는 배열 모두 허용.
+  const srcDirs = (Array.isArray(CFG.srcDir) ? CFG.srcDir : [CFG.srcDir || "src/"])
+    .filter(Boolean)
+    .map((d) => (d.endsWith("/") ? d : `${d}/`));
   const isHttpUtil = /ut(il|ill)s\/http\./.test(filePath);
   const isTestFile = /\.(test|spec)\.(tsx?|jsx?)$/.test(filePath);
 
@@ -80,8 +83,8 @@ function checkL3(filePath, content, opts = {}) {
   }
 
   // [L3] rhf-zod — page forms without RHF
-  const isPage = filePath.includes(`${srcDir}pages/`) && filePath.endsWith(".tsx");
-  const isValidation = filePath.includes(`${srcDir}validation/`);
+  const isPage = filePath.endsWith(".tsx") && srcDirs.some((d) => filePath.includes(`${d}pages/`));
+  const isValidation = srcDirs.some((d) => filePath.includes(`${d}validation/`));
   if (isPage && !isValidation) {
     const hasState = /\buseState\b/.test(clean);
     const hasUseForm = /\buseForm\b/.test(clean);

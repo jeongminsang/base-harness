@@ -155,7 +155,7 @@ ADAPTERS=$(prompt_choice "Adapter install" "omc | omo | omx | codex | all" "all"
 # plain '-b'; emit behavior belongs in tsconfig's "noEmit".
 BUILD_CMD=$(prompt "Build check command" "./node_modules/.bin/tsc -b")
 LINT_CMD=$(prompt "Lint command" "npx eslint")
-SRC_DIR=$(prompt "Source directory" "src/")
+SRC_DIR=$(prompt "Source directories (comma-separated)" "src/")
 ARCH_PATHS_RAW=$(prompt "ARCH-TRIGGER paths (comma-separated)" "src/pages/,src/components/")
 MIN_DIFF=$(prompt "Min diff lines for skill mining" "10")
 
@@ -180,6 +180,7 @@ fetch_file "hooks/pre-task.cjs"             "hooks/pre-task.cjs"
 fetch_file "hooks/pre-tool-enforcer.cjs"    "hooks/pre-tool-enforcer.cjs"
 fetch_file "hooks/post-task.cjs"            "hooks/post-task.cjs"
 fetch_file "hooks/post-bash-verifier.cjs"   "hooks/post-bash-verifier.cjs"
+fetch_file "hooks/session-baseline.cjs"     "hooks/session-baseline.cjs"
 fetch_file "hooks/stop-enforcer.cjs"        "hooks/stop-enforcer.cjs"
 fetch_file "hooks/run-final-check.cjs"      "hooks/run-final-check.cjs"
 fetch_file "hooks/on-failure.cjs"           "hooks/on-failure.cjs"
@@ -197,7 +198,20 @@ info "Installing Git Pre-Commit Gate..."
 mkdir -p hooks/git
 fetch_file "hooks/git/pre-commit" "hooks/git/pre-commit"
 chmod +x hooks/git/pre-commit
-git config core.hooksPath hooks/git
+
+# Don't silently kill an existing hook setup (husky etc.) — core.hooksPath is
+# exclusive, so overriding it disables whatever ran there before.
+EXISTING_HOOKS_PATH="$(git config core.hooksPath 2>/dev/null || true)"
+if { [[ -n "$EXISTING_HOOKS_PATH" && "$EXISTING_HOOKS_PATH" != "hooks/git" ]]; } || { [[ -z "$EXISTING_HOOKS_PATH" && -d ".husky" ]]; }; then
+  warn "Existing git hook setup detected (core.hooksPath='${EXISTING_HOOKS_PATH:-unset}'$([[ -d .husky ]] && echo ", .husky/ present"))"
+  if prompt_yn "Override core.hooksPath to hooks/git? (existing hooks will stop running)" "n"; then
+    git config core.hooksPath hooks/git
+  else
+    warn "Skipped core.hooksPath. Chain manually: call 'hooks/git/pre-commit' from your existing pre-commit hook."
+  fi
+else
+  git config core.hooksPath hooks/git
+fi
 
 if [[ -f "package.json" ]]; then
   HAS_PREPARE=$(node -e "
@@ -251,23 +265,29 @@ ok "Preset ${PRESET} → hooks/lib/l3-preset.cjs"
 # ─── Step 5: Write config.json ────────────────────────────────────────────────
 
 info "Writing hooks/config.json..."
-cat > hooks/config.json << CONFIGEOF
-{
-  "version": "0.1",
-  "preset": "${PRESET}",
-  "adapters": "${ADAPTERS}",
-  "buildCheckCmd": "${BUILD_CMD}",
-  "lintCmd": "${LINT_CMD}",
-  "srcDir": "${SRC_DIR}",
-  "archTriggerPaths": ${ARCH_JSON},
-  "qaTriggerMinLines": 50,
-  "qualityGate": {
-    "minDiffLines": ${MIN_DIFF},
-    "rejectWhitespaceOnly": true,
-    "rejectIfDuplicateSkill": true
-  }
-}
-CONFIGEOF
+# JSON.stringify via node — a heredoc breaks as soon as a value contains a
+# double quote; env passing needs no shell escaping at all.
+CFG_PRESET="$PRESET" CFG_ADAPTERS="$ADAPTERS" CFG_BUILD="$BUILD_CMD" CFG_LINT="$LINT_CMD" \
+CFG_SRC="$SRC_DIR" CFG_ARCH="$ARCH_JSON" CFG_MINDIFF="$MIN_DIFF" node -e '
+const fs = require("fs");
+const src = process.env.CFG_SRC.split(",").map((s) => s.trim()).filter(Boolean);
+const cfg = {
+  version: "0.1",
+  preset: process.env.CFG_PRESET,
+  adapters: process.env.CFG_ADAPTERS,
+  buildCheckCmd: process.env.CFG_BUILD,
+  lintCmd: process.env.CFG_LINT,
+  srcDir: src.length === 1 ? src[0] : src,
+  archTriggerPaths: JSON.parse(process.env.CFG_ARCH),
+  qaTriggerMinLines: 50,
+  qualityGate: {
+    minDiffLines: Number(process.env.CFG_MINDIFF) || 10,
+    rejectWhitespaceOnly: true,
+    rejectIfDuplicateSkill: true,
+  },
+};
+fs.writeFileSync("hooks/config.json", JSON.stringify(cfg, null, 2) + "\n");
+'
 ok "hooks/config.json written"
 
 # ─── Step 6: Install adapters ────────────────────────────────────────────────

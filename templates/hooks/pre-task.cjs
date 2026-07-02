@@ -12,7 +12,10 @@ const K = 3;
 
 let CFG = {};
 try { CFG = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8")); } catch {}
-const SRC_DIR = CFG.srcDir || "src/";
+// srcDir은 문자열 또는 배열(예: Next.js의 app/ + src/) 모두 허용.
+const SRC_DIRS = (Array.isArray(CFG.srcDir) ? CFG.srcDir : [CFG.srcDir || "src/"])
+  .filter(Boolean)
+  .map((d) => (d.endsWith("/") ? d : `${d}/`));
 
 // 프로젝트 소스 파일 판정 — srcDir은 preset마다 다르므로(config.json) 하드코딩하지 않는다.
 // ROOT와 file_path의 symlink 표기가 어긋날 수 있어(macOS /tmp 등) 양쪽 다 realpath로 정규화.
@@ -22,7 +25,7 @@ function isProjectSource(filePath) {
   let abs = path.resolve(REAL_ROOT, filePath);
   try { abs = path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs)); } catch {}
   const rel = path.relative(REAL_ROOT, abs);
-  return !rel.startsWith("..") && rel.startsWith(SRC_DIR);
+  return !rel.startsWith("..") && SRC_DIRS.some((d) => rel.startsWith(d));
 }
 
 // Adapter hook path: stdin JSON → tool_input 텍스트 추출
@@ -30,12 +33,15 @@ function isProjectSource(filePath) {
 const isCliMode = process.argv.length > 2;
 let task = process.argv.slice(2).join(" ").toLowerCase();
 let sessionId = null;
+let stdinToolInput = null;
 if (!task && !process.stdin.isTTY) {
   try {
-    const raw = fs.readFileSync("/dev/stdin", "utf8");
+    // fd 0 — /dev/stdin은 Windows에 없다.
+    const raw = fs.readFileSync(0, "utf8");
     const payload = JSON.parse(raw);
     sessionId = payload.session_id || null;
     const ti = payload.tool_input || {};
+    stdinToolInput = ti;
     // 프로젝트 소스 파일 대상일 때만 주입 — 레포 밖/비소스 파일 쓰기에
     // 컨벤션 스킬을 주입하는 것은 컨텍스트 노이즈다 (enforcer와 동일 기준)
     if (ti.file_path && !isProjectSource(ti.file_path)) {
@@ -111,18 +117,30 @@ if (sessionId) {
     console.error("[pre-task] matched skills already injected this session; exit.");
     process.exit(0);
   }
-  entry.skills = [...seen, ...toInject.map(({ file }) => path.relative(ROOT, file))];
-  entry.updatedAt = Date.now();
-  state.sessions[sessionId] = entry;
-  // 최근 5개 세션만 유지 (파일 무한 성장 방지)
-  const keep = Object.keys(state.sessions)
-    .sort((a, b) => (state.sessions[b].updatedAt || 0) - (state.sessions[a].updatedAt || 0))
-    .slice(0, 5);
-  state.sessions = Object.fromEntries(keep.map((id) => [id, state.sessions[id]]));
-  try {
-    fs.mkdirSync(path.dirname(STATE), { recursive: true });
-    fs.writeFileSync(STATE, JSON.stringify(state));
-  } catch {}
+  // pre-tool-enforcer가 이 호출을 deny하면 additionalContext 전달이 보장되지
+  // 않는다 — 주입 기록은 통과할 호출에만 남긴다(거부 후 재시도에서 재주입).
+  let denyLikely = false;
+  if (stdinToolInput && stdinToolInput.file_path) {
+    try {
+      const { checkL3 } = require("./lib/l3-rules.cjs");
+      const content = stdinToolInput.content || stdinToolInput.new_string || "";
+      denyLikely = checkL3(stdinToolInput.file_path, content, {}).length > 0;
+    } catch {}
+  }
+  if (!denyLikely) {
+    entry.skills = [...seen, ...toInject.map(({ file }) => path.relative(ROOT, file))];
+    entry.updatedAt = Date.now();
+    state.sessions[sessionId] = entry;
+    // 최근 5개 세션만 유지 (파일 무한 성장 방지)
+    const keep = Object.keys(state.sessions)
+      .sort((a, b) => (state.sessions[b].updatedAt || 0) - (state.sessions[a].updatedAt || 0))
+      .slice(0, 5);
+    state.sessions = Object.fromEntries(keep.map((id) => [id, state.sessions[id]]));
+    try {
+      fs.mkdirSync(path.dirname(STATE), { recursive: true });
+      fs.writeFileSync(STATE, JSON.stringify(state));
+    } catch {}
+  }
 }
 
 const MAX_SKILL_CHARS = 4000;

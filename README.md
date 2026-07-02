@@ -58,9 +58,13 @@ Note: Optional adapter configurations like `.claude/`, `.opencode/`, `.omx/`, or
 
 Deterministic checks (L3 scan → tsc → eslint) are enforced automatically via Stop hook and git pre-commit. No verification state files are written or reviewed by models — a gate the model can write is a gate the model will rubber-stamp; only checks the model cannot forge (regex scan, tsc, eslint, fresh-context review) act as gates.
 
+Scoping: the Stop hook only gates files changed during the session (a SessionStart baseline excludes pre-existing user WIP), and pre-commit validates staged (index) content so partial staging is checked against what actually gets committed.
+
 ## Skill Injection
 
 `pre-task.cjs` injects matching skills as `additionalContext` on Write/Edit. Each skill is injected at most once per session (deduplicated via `.omc/state/injected-skills.json`), keeping token usage flat across long sessions. Auto-mined `.draft.md` files are never injected — a human promotes a draft by renaming it to `.md` (DRAFT-FIRST).
+
+Note: injection relies on `PreToolUse` `additionalContext` support, which requires a recent Claude Code version — on older versions injection is silently skipped (enforcement gates are unaffected).
 
 ## Update
 

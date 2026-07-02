@@ -12,9 +12,9 @@ const { ROOT } = require("./lib/l3-rules.cjs");
 function reviewReminder() {
   const cfg = loadConfig();
   const archPaths = cfg.archTriggerPaths || ["src/pages/", "src/components/"];
-  const minLines = cfg.qaTriggerMinLines || 30;
+  const minLines = cfg.qaTriggerMinLines || 50;
   try {
-    const stat = execSync(`git diff HEAD --numstat -- ${archPaths.join(" ")}`, {
+    const stat = execSync(`git diff HEAD --numstat -- ${archPaths.map((p) => `"${p}"`).join(" ")}`, {
       cwd: ROOT,
       encoding: "utf8",
       timeout: 5000,
@@ -55,6 +55,22 @@ function writeAttempts(count) {
   } catch {}
 }
 
+// Session baseline (written by hooks/session-baseline.cjs on SessionStart):
+// files dirty before the session started are the user's WIP — the gate only
+// enforces what this session changed.
+function loadBaseline(sessionId) {
+  if (!sessionId) return null;
+  try {
+    const state = JSON.parse(
+      fs.readFileSync(path.join(ROOT, ".omc/state/session-baseline.json"), "utf8")
+    );
+    const entry = state.sessions && state.sessions[sessionId];
+    return entry && entry.files ? entry.files : null;
+  } catch {
+    return null;
+  }
+}
+
 let raw = "";
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
@@ -66,20 +82,10 @@ process.stdin.on("end", () => {
     return;
   }
 
-  // Involuntary or user-initiated stops must never be gated: blocking a
-  // context-limit stop just burns the remaining window, and blocking a user
-  // cancel overrides an explicit human decision.
-  const stopReason = (data.stop_reason || "").toLowerCase();
-  if (stopReason.includes("context_limit") || stopReason.includes("max_tokens")) {
-    console.log(JSON.stringify({ continue: true, suppressOutput: true }));
-    return;
-  }
-  if (data.user_requested || stopReason.includes("user_cancel")) {
-    console.log(JSON.stringify({ continue: true, suppressOutput: true }));
-    return;
-  }
-
-  const result = evaluateFinalGate();
+  // Note: Stop hook input carries no stop-reason field — involuntary stops
+  // (context limit) and user interrupts don't fire this hook at all, so no
+  // special-casing is needed here.
+  const result = evaluateFinalGate({ baselineFiles: loadBaseline(data.session_id) });
   if (result.ok) {
     writeAttempts(0);
     const reminder = reviewReminder();

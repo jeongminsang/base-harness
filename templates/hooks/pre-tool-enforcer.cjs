@@ -12,6 +12,8 @@ process.stdin.on("end", () => {
   try {
     payload = JSON.parse(raw || "{}");
   } catch {
+    // Fail-open by design (final gate still applies) — but never silently.
+    process.stderr.write("[pre-tool-enforcer] stdin parse failed — allowing (fail-open)\n");
     allow();
     return;
   }
@@ -43,10 +45,14 @@ process.stdin.on("end", () => {
 
 function isSrcFile(p) {
   // srcDir은 preset마다 다르므로(config.json) 하드코딩하지 않는다.
-  let srcDir = "src/";
+  // 문자열 또는 배열(예: Next.js의 app/ + src/) 모두 허용.
+  let raw = "src/";
   try {
-    srcDir = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8")).srcDir || "src/";
+    raw = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8")).srcDir || "src/";
   } catch {}
+  const srcDirs = (Array.isArray(raw) ? raw : [raw])
+    .filter(Boolean)
+    .map((d) => (d.endsWith("/") ? d : `${d}/`));
   if (!/\.(tsx?|jsx?)$/.test(p)) return false;
   // ROOT와 p의 symlink 표기가 어긋날 수 있어(macOS /tmp 등) 양쪽 다 realpath로 정규화.
   let realRoot = ROOT;
@@ -54,7 +60,7 @@ function isSrcFile(p) {
   let abs = path.resolve(realRoot, p);
   try { abs = path.join(fs.realpathSync(path.dirname(abs)), path.basename(abs)); } catch {}
   const rel = path.relative(realRoot, abs);
-  return !rel.startsWith("..") && rel.startsWith(srcDir);
+  return !rel.startsWith("..") && srcDirs.some((d) => rel.startsWith(d));
 }
 
 function deny(violations, warnings) {

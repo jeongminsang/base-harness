@@ -67,13 +67,14 @@ Each harness persona declares its required capability tier in `agents/<persona>.
 
 ### Platform Model Mapping
 
-Map each tier to your platform's available models:
+Map each tier to your platform's available models. Do NOT hardcode versioned
+model IDs here — they go stale; use the platform's current alias for each tier:
 
-| Platform | Tier 3 (Max)         | Tier 2 (Balanced)    | Tier 1 (Light)       |
-|----------|----------------------|----------------------|----------------------|
-| OMC      | claude-opus-4-6      | claude-sonnet-4-6    | claude-haiku-4-5     |
-| OMO      | deepseek-v4-pro      | deepseek-v4          | deepseek-v4-mini     |
-| OMX      | (platform default)   | (platform default)   | (platform default)   |
+| Platform | Tier 3 (Max)       | Tier 2 (Balanced)  | Tier 1 (Light)     |
+|----------|--------------------|--------------------|--------------------|
+| OMC      | opus (latest)      | sonnet (latest)    | haiku (latest)     |
+| OMO      | (platform max)     | (platform default) | (platform light)   |
+| OMX      | (platform max)     | (platform default) | (platform light)   |
 
 ### Platform Agent Mapping
 
@@ -134,7 +135,7 @@ commit → pre-commit mining (.draft.md)        [자동, 커밋당 1회]
 
 - **디베이트 레저 제거**: 셀프 도장 실증으로 구조적 무력화가 확인되어 기존의 디베이트 상태 파일(rounds.json 등)은 완전히 삭제됨.
 - **fresh-context 리뷰**: 설계안이나 대규모 변경은 대화 히스토리 없이 변경 코드(diff)와 스킬 파일만 전달하여 `/code-review` 또는 별도 reviewer 에이전트로 수행해야 함.
-- **Stop 리마인더**: Stop 훅 게이트 통과 시 주요 경로에 미커밋 변경이 `qaTriggerMinLines`(기본 30)줄 이상 있을 경우 차단 없이 `/code-review`를 권고하는 메시지를 띄움.
+- **Stop 리마인더**: Stop 훅 게이트 통과 시 주요 경로에 미커밋 변경이 `qaTriggerMinLines`(기본 50)줄 이상 있을 경우 차단 없이 `/code-review`를 권고하는 메시지를 띄움.
 
 ## 9. Codex Workflow
 

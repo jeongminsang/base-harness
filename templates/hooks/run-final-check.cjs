@@ -3,7 +3,8 @@
 
 const { evaluateFinalGate } = require("./lib/final-gate.cjs");
 
-const result = evaluateFinalGate();
+// --staged: validate index content (pre-commit path) instead of the working tree.
+const result = evaluateFinalGate({ staged: process.argv.includes("--staged") });
 
 if (result.ok) {
   if (result.skipped) {

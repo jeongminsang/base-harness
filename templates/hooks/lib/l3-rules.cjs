@@ -80,8 +80,10 @@ function checkL3Core(filePath, content, opts = {}) {
   const violations = [];
   const clean = opts.clean != null ? opts.clean : stripComments(content);
 
-  // [L3] no-any-type — universal
-  if (/:\s*any\b|as\s+any\b|<any>|Record<string,\s*any>/.test(clean)) {
+  // [L3] no-any-type — universal. Covers `: any`, `as any`, `any[]`, and
+  // generic positions (`<any>`, `<any, …`, `…, any>`); tsc strict is not a
+  // backstop here since `any` is not a type error.
+  if (/:\s*any\b|as\s+any\b|<\s*any\s*[,>]|,\s*any\s*>|\bany\[\]/.test(clean)) {
     violations.push({
       skill: "no-any-type (L3)",
       detail: "`any` type detected. Use `unknown` or an explicit type.",

@@ -37,6 +37,8 @@ Claude, OpenCode (OMO), and OMX share the same hook event API. Each uses automat
 - OpenCode (OMO): `.opencode/settings.json`
 - OMX: `.omx/settings.json`
 
+- `SessionStart` → `hooks/session-baseline.cjs`
+  - Snapshots files already dirty when the session begins (`.omc/state/session-baseline.json`). The stop gate only enforces files changed *after* this baseline — pre-existing user WIP never blocks the model's stops.
 - `PreToolUse` → `hooks/pre-tool-enforcer.cjs`, `hooks/pre-task.cjs`
   - `pre-task.cjs` injects matching skills via `hookSpecificOutput.additionalContext` (plain stdout is not injected into model context). Injection is deduplicated per session (`.omc/state/injected-skills.json`, last 5 sessions kept) — a skill already in the conversation context is not re-injected, saving tokens.
 - `PostToolUse` for bash → `hooks/post-bash-verifier.cjs`
@@ -61,7 +63,10 @@ Gate order:
 2. `buildCheckCmd` passes.
 3. `lintCmd` passes on changed files.
 
-Stop hook and pre-commit hook run the exact same gate pipeline.
+Stop hook and pre-commit hook run the same gate pipeline with different scopes:
+
+- **Stop hook**: session-scoped — files matching the SessionStart baseline (untouched user WIP) are excluded. Note: `buildCheckCmd` is inherently project-wide, so pre-existing type errors can still fail gate 2; the MAX_BLOCKS cap (3) bounds the damage.
+- **pre-commit**: staged-scoped (`--staged`) — L3 checks read index content (`git show :file`), so partial staging is validated against what the commit will actually contain. Build/lint still run against the working tree (a known, documented limitation).
 
 ## 6. Review (fresh-context)
 
@@ -117,3 +122,5 @@ commit → pre-commit mining (.draft.md)        [자동, 커밋당 1회]
   }
 }
 ```
+
+`srcDir`는 문자열 또는 배열(`["app/", "src/"]`)을 허용한다 — Next.js처럼 소스 루트가 여러 개인 프로젝트 지원.

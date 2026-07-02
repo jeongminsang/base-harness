@@ -1,5 +1,17 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node hooks/session-baseline.cjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Write|Edit",
@@ -36,7 +48,7 @@
           {
             "type": "command",
             "command": "node hooks/stop-enforcer.cjs",
-            "timeout": 120
+            "timeout": 180
           }
         ]
       }

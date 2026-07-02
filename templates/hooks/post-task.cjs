@@ -10,14 +10,19 @@ const SKILLS = path.join(ROOT, "skills");
 const MEM = path.join(ROOT, "memory", "project-memory.json");
 const CFG = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
 const QG = CFG.qualityGate;
-const SRC_DIR = CFG.srcDir || "src/";
+// srcDir은 문자열 또는 배열(예: Next.js의 app/ + src/) 모두 허용.
+const SRC_DIRS = (Array.isArray(CFG.srcDir) ? CFG.srcDir : [CFG.srcDir || "src/"])
+  .filter(Boolean)
+  .map((d) => (d.endsWith("/") ? d : `${d}/`));
 
 function sh(cmd) {
   try { return execSync(cmd, { cwd: ROOT, encoding: "utf8" }); }
   catch { return ""; }
 }
 
-const diff = sh("git diff HEAD");
+// pre-commit 시점에는 커밋될 내용(index)을 채굴한다; staged가 없으면 워킹트리 fallback.
+let diff = sh("git diff --cached");
+if (!diff.trim()) diff = sh("git diff HEAD");
 if (!diff.trim()) { console.error("[post-task] empty diff; exit."); process.exit(0); }
 
 const lines = diff.split("\n");
@@ -33,11 +38,14 @@ const files = [...diff.matchAll(/^\+\+\+ b\/(\S+)/gm)].map(m => m[1]);
 
 // Heuristic bucket matching — driven by srcDir
 let bucket = null, slug = null, triggers = [];
-for (const f of files) {
-  if (f.startsWith(`${SRC_DIR}validation/`)) { bucket = "conventions"; slug = "zod-schema-" + path.basename(f, path.extname(f)); triggers = ["zod", "schema", "validation"]; break; }
-  if (f.startsWith(`${SRC_DIR}api/`))        { bucket = "libraries";  slug = "api-" + path.basename(f, path.extname(f)); triggers = ["api", "http", path.basename(f, path.extname(f))]; break; }
-  if (f.startsWith(`${SRC_DIR}hooks/`))      { bucket = "components"; slug = "hook-" + path.basename(f, path.extname(f)); triggers = ["hook", path.basename(f, path.extname(f))]; break; }
-  if (f.startsWith(`${SRC_DIR}components/`)) { bucket = "components"; slug = "cmp-" + path.basename(f, path.extname(f)); triggers = ["component", path.basename(f, path.extname(f))]; break; }
+outer: for (const f of files) {
+  for (const d of SRC_DIRS) {
+    if (!f.startsWith(d)) continue;
+    if (f.startsWith(`${d}validation/`)) { bucket = "conventions"; slug = "zod-schema-" + path.basename(f, path.extname(f)); triggers = ["zod", "schema", "validation"]; break outer; }
+    if (f.startsWith(`${d}api/`))        { bucket = "libraries";  slug = "api-" + path.basename(f, path.extname(f)); triggers = ["api", "http", path.basename(f, path.extname(f))]; break outer; }
+    if (f.startsWith(`${d}hooks/`))      { bucket = "components"; slug = "hook-" + path.basename(f, path.extname(f)); triggers = ["hook", path.basename(f, path.extname(f))]; break outer; }
+    if (f.startsWith(`${d}components/`)) { bucket = "components"; slug = "cmp-" + path.basename(f, path.extname(f)); triggers = ["component", path.basename(f, path.extname(f))]; break outer; }
+  }
 }
 if (!bucket) { console.error("[post-task] no bucket matched; exit."); process.exit(0); }
 
@@ -64,7 +72,8 @@ source_commit: ${commit}
 
 # ${slug} (DRAFT)
 
-Auto-mined from diff at \`${commit}\`. Touched files:
+Auto-mined at pre-commit (parent commit \`${commit}\` — the new commit SHA
+does not exist yet at mining time). Touched files:
 ${files.map(f => `- \`${f}\``).join("\n")}
 
 ## Diff excerpt (first 40 lines)

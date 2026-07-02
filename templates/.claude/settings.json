@@ -2,11 +2,22 @@
   "permissions": {
     "allow": [
       "Bash(git add *)",
-      "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git commit *)"
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/hooks/session-baseline.cjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Write|Edit",
@@ -43,7 +54,7 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/hooks/stop-enforcer.cjs\"",
-            "timeout": 120
+            "timeout": 180
           }
         ]
       }
